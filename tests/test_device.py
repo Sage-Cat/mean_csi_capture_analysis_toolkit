@@ -15,6 +15,13 @@ class DeviceResolutionTests(unittest.TestCase):
         self.assertEqual(resolved.path, "/dev/test_serial")
         self.assertEqual(resolved.source, "cli")
 
+    @patch("csi_capture.core.device.list_serial_candidates", return_value=["COM4"])
+    @patch("csi_capture.core.device.os.path.exists", return_value=False)
+    def test_resolve_auto_keyword_uses_detected_candidate(self, _exists_mock, _list_mock):
+        resolved = resolve_serial_device(cli_device="auto", env={}, default="/dev/esp32_csi")
+        self.assertEqual(resolved.path, "COM4")
+        self.assertEqual(resolved.source, "auto")
+
     @patch("csi_capture.core.device.list_serial_candidates", return_value=["/dev/cu.usbmodem1101"])
     @patch("csi_capture.core.device.os.path.exists", return_value=False)
     def test_resolve_auto_device_when_default_missing(self, _exists_mock, _list_mock):
@@ -32,7 +39,10 @@ class DeviceResolutionTests(unittest.TestCase):
 
     @patch("csi_capture.core.device.os.path.exists", side_effect=lambda path: path == "/dev/esp32_csi")
     @patch("csi_capture.core.device.glob.glob")
-    def test_list_serial_candidates_includes_linux_and_macos_patterns(self, glob_mock, _exists_mock):
+    @patch("csi_capture.core.device._list_pyserial_candidates", return_value=[])
+    def test_list_serial_candidates_includes_linux_and_macos_patterns(
+        self, _serial_mock, glob_mock, _exists_mock
+    ):
         def fake_glob(pattern):
             mapping = {
                 "/dev/ttyACM*": ["/dev/ttyACM0"],
@@ -51,6 +61,28 @@ class DeviceResolutionTests(unittest.TestCase):
         self.assertIn("/dev/ttyUSB0", candidates)
         self.assertIn("/dev/cu.usbmodem1101", candidates)
         self.assertIn("/dev/tty.usbmodem1101", candidates)
+
+    @patch("csi_capture.core.device.os.path.exists", return_value=False)
+    @patch("csi_capture.core.device.glob.glob", return_value=[])
+    @patch("csi_capture.core.device._list_pyserial_candidates", return_value=["COM4", "COM7"])
+    def test_list_serial_candidates_includes_windows_com_ports(
+        self, _serial_mock, _glob_mock, _exists_mock
+    ):
+        candidates = list_serial_candidates()
+        self.assertIn("COM4", candidates)
+        self.assertIn("COM7", candidates)
+
+    @patch("csi_capture.core.device._list_pyserial_candidates", return_value=["COM4"])
+    @patch("csi_capture.core.device.platform.system", return_value="Windows")
+    def test_validate_serial_device_access_accepts_windows_com_port(self, _platform_mock, _list_mock):
+        validate_serial_device_access("COM4")
+
+    @patch("csi_capture.core.device._list_pyserial_candidates", return_value=["COM4"])
+    @patch("csi_capture.core.device.platform.system", return_value="Windows")
+    def test_validate_serial_device_access_has_windows_hint(self, _platform_mock, _list_mock):
+        with self.assertRaises(DeviceAccessError) as exc:
+            validate_serial_device_access("COM7")
+        self.assertIn("Windows fix", str(exc.exception))
 
 
 if __name__ == "__main__":

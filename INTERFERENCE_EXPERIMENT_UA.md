@@ -176,6 +176,71 @@
 
 ## 8) Як запускати
 
+Примітка:
+
+- Linux/macOS: можна як і раніше запускати `./scripts/run_interference_protocol.sh`
+- Windows без WSL: використовуйте `py -3 -m csi_capture.interference_protocol` або `scripts\run_interference_protocol.cmd`
+- окремий покроковий Windows workflow: `docs/experiments/interference_v1_windows_workflow.md`
+
+### 8.0 Windows без WSL: що саме відрізняється
+
+Для `Windows` відмінності тільки такі:
+
+- замість `./scripts/run_interference_protocol.sh` запускати `py -3 -m csi_capture.interference_protocol`
+- замість `/dev/ttyACM*` або `/dev/esp32_csi` використовувати `COM`-порти, наприклад `COM3` і `COM4`
+- TX/RX прошивати з `ESP-IDF PowerShell` або `cmd`, де доступний `idf.py`
+
+Мінімальна послідовність:
+
+```powershell
+cd C:\path\to\csi_capturing_example
+py -3 -m pip install -r requirements.txt
+py -3 -m csi_capture.cli --list-devices
+```
+
+Очікування:
+
+- у списку пристроїв мають з'явитися порти на кшталт `COM3`, `COM4`
+
+Приклад для TX:
+
+```powershell
+cd %USERPROFILE%\esp\esp-csi\examples\get-started\csi_send
+idf.py set-target esp32s3
+idf.py -p COM3 -b 921600 flash
+```
+
+Приклад для RX:
+
+```powershell
+cd %USERPROFILE%\esp\esp-csi\examples\get-started\csi_recv
+idf.py set-target esp32s3
+idf.py -p COM4 -b 921600 flash
+```
+
+Після цього матрицю сценаріїв і сам експеримент запускати так:
+
+```powershell
+cd C:\path\to\csi_capturing_example
+py -3 -m csi_capture.interference_protocol --list-scenarios
+
+py -3 -m csi_capture.interference_protocol `
+  --device COM4 `
+  --target-profile esp32s3_csi_v1 `
+  --exp-id exp_interference_core_20260309 `
+  --scenario-set core `
+  --runs 3 `
+  --max-records 1500 `
+  --notes "windows room campaign"
+```
+
+Очікування:
+
+- спочатку буде `dry-run` перевірка порту
+- далі скрипт зупинятиметься перед кожним сценарієм і кожним run
+- після кожного run має з'явитися `Captured <N> records`
+- дані будуть записані у `experiments/<exp_id>/...`
+
 ### 8.1 Підняти TX
 
 ```bash

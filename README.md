@@ -224,7 +224,15 @@ New experiment framework CLI (includes `static_sign_v1`):
   --experiment presence_v1 \
   --mode capture \
   --config docs/configs/presence_v1.capture.sample.json
+
+# Interference protocol (cross-platform Python entrypoint)
+python3 -m csi_capture.interference_protocol --list-scenarios
+python3 -m csi_capture.interference_protocol --device auto --scenario-set core --runs 3 --max-records 1500
 ```
+
+Native Windows workflow for `interference_v1`:
+
+- `docs/experiments/interference_v1_windows_workflow.md`
 
 Device selection precedence for `tools/exp capture`:
 

@@ -28,7 +28,7 @@ def _print_list_devices() -> None:
         print(
             "No candidate serial devices found under "
             "/dev/esp32_csi, /dev/ttyACM*, /dev/ttyUSB*, "
-            "/dev/tty.usbmodem*, /dev/cu.usbmodem*, /dev/tty.usbserial*, /dev/cu.usbserial*."
+            "/dev/tty.usbmodem*, /dev/cu.usbmodem*, /dev/tty.usbserial*, /dev/cu.usbserial*, or COM ports."
         )
         return
 
@@ -164,7 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "List serial candidates: /dev/esp32_csi, /dev/ttyACM*, /dev/ttyUSB*, "
-            "/dev/tty.usbmodem*, /dev/cu.usbmodem*, /dev/tty.usbserial*, /dev/cu.usbserial*"
+            "/dev/tty.usbmodem*, /dev/cu.usbmodem*, /dev/tty.usbserial*, /dev/cu.usbserial*, COMx"
         ),
     )
     parser.add_argument(

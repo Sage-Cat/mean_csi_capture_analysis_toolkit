@@ -3,6 +3,7 @@ from __future__ import annotations
 import glob
 import os
 import platform
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -17,6 +18,7 @@ SERIAL_GLOB_PATTERNS: Sequence[str] = (
     "/dev/tty.usbserial*",
     "/dev/cu.usbserial*",
 )
+WINDOWS_COM_PORT_RE = re.compile(r"^(?:\\\\\.\\)?(COM\d+)$", re.IGNORECASE)
 
 
 class DeviceAccessError(RuntimeError):
@@ -31,10 +33,43 @@ class ResolvedDevice:
 
 
 def _safe_realpath(path: str) -> str:
+    if _is_windows_com_port(path):
+        return _normalize_windows_port(path)
     try:
         return str(Path(path).resolve(strict=False))
     except OSError:
         return os.path.realpath(path)
+
+
+def _normalize_windows_port(path: str) -> str:
+    match = WINDOWS_COM_PORT_RE.match(path.strip())
+    if match is None:
+        return path.strip()
+    return match.group(1).upper()
+
+
+def _is_windows_com_port(path: str) -> bool:
+    return WINDOWS_COM_PORT_RE.match(path.strip()) is not None
+
+
+def _list_pyserial_candidates() -> list[str]:
+    if platform.system() != "Windows":
+        return []
+
+    try:
+        from serial.tools import list_ports
+    except ModuleNotFoundError:
+        return []
+
+    candidates: list[str] = []
+    for port in list_ports.comports():
+        device = str(getattr(port, "device", "") or "").strip()
+        if not device:
+            continue
+        device = _normalize_windows_port(device)
+        if device not in candidates:
+            candidates.append(device)
+    return candidates
 
 
 def resolve_serial_device(
@@ -43,8 +78,9 @@ def resolve_serial_device(
     default: str = DEFAULT_SERIAL_DEVICE,
 ) -> ResolvedDevice:
     env_map = env if env is not None else os.environ
-    if cli_device and cli_device.strip():
-        selected = cli_device.strip()
+    cli_value = cli_device.strip() if cli_device is not None else ""
+    if cli_value and cli_value.lower() != "auto":
+        selected = cli_value
         source = "cli"
     else:
         selected = ""
@@ -79,10 +115,27 @@ def list_serial_candidates() -> list[str]:
             if path not in candidates:
                 candidates.append(path)
 
+    for path in _list_pyserial_candidates():
+        if path not in candidates:
+            candidates.append(path)
+
     return candidates
 
 
 def validate_serial_device_access(path: str) -> None:
+    if platform.system() == "Windows":
+        normalized = _normalize_windows_port(path)
+        known_ports = {_normalize_windows_port(candidate) for candidate in _list_pyserial_candidates()}
+        if normalized in known_ports:
+            return
+        raise DeviceAccessError(
+            f"serial device does not exist or is not enumerated: {path}\n"
+            "Windows fix:\n"
+            "  1) confirm Device Manager shows the board under Ports (COM & LPT)\n"
+            "  2) run --list-devices to inspect detected COM ports\n"
+            "  3) retry with --device COMx"
+        )
+
     if not os.path.exists(path):
         raise DeviceAccessError(
             f"serial device does not exist: {path}\n"

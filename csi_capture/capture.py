@@ -3,12 +3,11 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
-import platform
 import time
 from pathlib import Path
 from typing import IO, Iterable, Iterator, Optional, TextIO
 
+from csi_capture.core.device import DeviceAccessError, validate_serial_device_access
 from csi_capture.parser import CSIRecord, parse_csi_line
 
 
@@ -86,25 +85,11 @@ def capture_stream(
 
 
 def ensure_serial_port_access(port: str) -> None:
-    """Validate that a serial device path exists and is readable/writable."""
-    if not os.path.exists(port):
-        raise SerialPortAccessError(f"serial port does not exist: {port}")
-    if not os.access(port, os.R_OK | os.W_OK):
-        if platform.system() == "Darwin":
-            raise SerialPortAccessError(
-                f"no read/write access to serial port: {port}\n"
-                "macOS fix:\n"
-                "  1) close any serial monitor app using the port\n"
-                "  2) unplug/re-plug the board and retry\n"
-                "  3) verify with: ls -l /dev/cu.usbmodem* /dev/tty.usbmodem*"
-            )
-        raise SerialPortAccessError(
-            f"no read/write access to serial port: {port}\n"
-            "Linux fix:\n"
-            "  1) sudo usermod -a -G dialout $USER\n"
-            "  2) logout/login (or restart terminal session manager)\n"
-            "  3) verify: id -nG  (must include dialout)"
-        )
+    """Validate that a serial device is available for the current platform."""
+    try:
+        validate_serial_device_access(port)
+    except DeviceAccessError as exc:
+        raise SerialPortAccessError(str(exc)) from exc
 
 
 def serial_lines(
@@ -146,7 +131,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Capture ESP CSI_DATA into structured timestamp,rssi,csi records."
     )
-    parser.add_argument("-p", "--port", required=True, help="Serial port, e.g. /dev/ttyACM1")
+    parser.add_argument("-p", "--port", required=True, help="Serial port, e.g. /dev/ttyACM1 or COM4")
     parser.add_argument("-b", "--baud", type=int, default=921600, help="Serial baud rate")
     parser.add_argument(
         "-o",
