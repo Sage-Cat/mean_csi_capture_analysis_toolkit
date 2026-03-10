@@ -16,7 +16,7 @@ ANGLE_CONFIG ?= docs/configs/angle_capture.sample.json
 DATA_DIR ?= experiments
 OUT_DIR ?= out
 
-.PHONY: test setup-vscode capture tx-node rx-node rx-smoke static-sign-protocol static-sign-train-eval experiment-distance experiment-angle exp-help exp-list-devices exp-list-target-profiles exp-dry-run render-design analyze-distance analyze-stability analyze-angle analyze-all
+.PHONY: test setup-vscode capture tx-node rx-node rx-smoke static-sign-protocol static-sign-train-eval experiment-distance experiment-angle exp-help exp-list-devices exp-list-target-profiles exp-dry-run render-design analyze-distance analyze-stability analyze-angle analyze-all survey-24ghz
 
 setup-vscode:
 	./scripts/setup_vscode.sh
@@ -71,5 +71,8 @@ analyze-stability:
 
 analyze-angle:
 	$(PYTHON) tools/analyze_wifi_angle_dataset.py --data_dir $(DATA_DIR) --out_dir $(OUT_DIR)/angle_dataset
+
+survey-24ghz:
+	$(PYTHON) tools/survey_wifi_24ghz.py --focus-channel 11 --samples 3 --interval-s 2.0
 
 analyze-all: analyze-distance analyze-stability analyze-angle
