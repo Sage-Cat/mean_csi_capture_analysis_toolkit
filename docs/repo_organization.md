@@ -10,11 +10,10 @@ This repository is organized for a repeated capture-analysis cycle with multiple
 - `tests/`: unit tests.
 - `docs/`: notes, workflow, and methodology.
 - `data/`: small reusable sample files only.
-- `.vscode.template/`: shared VS Code defaults.
+- `../.vscode/`: shared VS Code workspace settings/tasks/debug config at the parent workspace root.
 
 ## Local Only (Git-Ignored)
 
-- `.vscode/`: each student's personal IDE settings/tasks copy.
 - `experiments/`: raw experiment runs and metadata.
 - `out/`: generated figures/tables/reports.
 - `out_*`: legacy output folders.
@@ -34,3 +33,5 @@ Alternative config-driven flow:
 3. Output is written to `experiments/<exp_id>/<experiment_type>/run_<run_id>/...` with `manifest.json`.
 
 This keeps source code clean while allowing unlimited local experiments.
+
+Open `/home/sagecat/Projects/research-workspace` in VS Code to use the shared workspace configuration.
