@@ -19,7 +19,7 @@ OUT_DIR ?= out
 .PHONY: test setup-vscode capture tx-node rx-node rx-smoke static-sign-protocol static-sign-train-eval experiment-distance experiment-angle exp-help exp-list-devices exp-list-target-profiles exp-dry-run render-design analyze-distance analyze-stability analyze-angle analyze-all
 
 setup-vscode:
-	./scripts/setup_vscode.sh
+	@echo "Open /home/sagecat/Projects/research-workspace in VS Code for the shared workspace configuration."
 
 test:
 	$(PYTHON) -m unittest discover -s tests -p "test_*.py" -v

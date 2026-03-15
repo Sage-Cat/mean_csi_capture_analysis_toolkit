@@ -19,10 +19,9 @@ docs/design/plantuml/     # PlantUML design source + rendered PNG diagrams
 experiments/              # Local raw runs (git-ignored except README/.gitkeep)
 out/                      # Local generated figures/tables/reports (git-ignored except README/.gitkeep)
 data/                     # Small reusable sample data only
-.vscode.template/         # Tracked VS Code defaults copied to local .vscode/
 ```
 
-`experiments/`, `out/`, build files, and `.vscode/` are intentionally ignored so students can run scripts locally without polluting git history.
+`experiments/`, `out/`, and build files are intentionally ignored so students can run scripts locally without polluting git history.
 
 ## 1) System Dependencies (Both Laptops)
 
@@ -79,13 +78,13 @@ cd csi_capturing_example
 python3 -m pip install -r requirements.txt
 ```
 
-Optional local VS Code bootstrap:
+Shared VS Code workspace:
 
 ```bash
-./scripts/setup_vscode.sh
+code /home/sagecat/Projects/research-workspace
 ```
 
-This copies tracked templates from `.vscode.template/` to your local ignored `.vscode/`.
+Workspace tasks, debugging, and agent/editor settings are centralized at the parent `research-workspace` root.
 
 Target environment profile (common across experiments):
 
