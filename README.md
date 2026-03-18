@@ -298,6 +298,16 @@ python3 tools/analyze_wifi_angle_dataset.py \
   --out_dir out/angle_dataset
 ```
 
+2.4 GHz radio-state survey before/while experiments:
+
+```bash
+python3 tools/survey_wifi_24ghz.py \
+  --focus-channel 11 \
+  --samples 3 \
+  --interval-s 2.0 \
+  --experiment-ssid <your_experiment_ssid>
+```
+
 Outputs are written to `out/` and are git-ignored.
 
 Static sign train/eval:
@@ -327,6 +337,7 @@ make rx-smoke PORT=/dev/ttyACM1 EXP_ID=exp_smoke
 make experiment-distance DISTANCE_CONFIG=docs/configs/distance_capture.sample.json
 make experiment-angle ANGLE_CONFIG=docs/configs/angle_radial_45deg_2runs.sample.json
 make analyze-distance DATA_DIR=experiments/<exp_id>
+make survey-24ghz
 make analyze-stability DATA_DIR=experiments/<exp_id>
 make analyze-angle DATA_DIR=experiments/<exp_id>/angle
 make analyze-all DATA_DIR=experiments/<exp_id>
