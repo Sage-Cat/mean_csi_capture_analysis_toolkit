@@ -16,7 +16,7 @@ tools/                    # Analysis scripts
 tests/                    # Unit tests
 docs/                     # Notes + config templates + architecture docs
 docs/design/plantuml/     # PlantUML design source + rendered PNG diagrams
-experiments/              # Local raw runs (git-ignored except README/.gitkeep)
+experiments/              # Local raw runs (git-ignored, often a local symlink)
 out/                      # Local generated figures/tables/reports (git-ignored except README/.gitkeep)
 data/                     # Small reusable sample data only
 ```

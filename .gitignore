@@ -13,10 +13,8 @@ pip-wheel-metadata/
 # Local editor workspace settings
 .vscode/
 
-# Local experiment runs (keep skeleton files tracked)
-/experiments/*
-!/experiments/.gitkeep
-!/experiments/README.md
+# Local experiment runs (directory or symlink)
+/experiments
 
 # Local analysis output (keep skeleton files tracked)
 /out/*
