@@ -868,12 +868,14 @@ def save_outputs(
     group_col: str,
     pca_ratio: np.ndarray,
     csi_estimator_desc: str,
+    plots_available: bool,
 ) -> None:
     """Persist all required tables, plots, and markdown report."""
     figs_dir = out_dir / "figs"
     tables_dir = out_dir / "tables"
-    figs_dir.mkdir(parents=True, exist_ok=True)
     tables_dir.mkdir(parents=True, exist_ok=True)
+    if plots_available:
+        figs_dir.mkdir(parents=True, exist_ok=True)
 
     overall_path = tables_dir / "table_metrics_overall.csv"
     scenario_path = tables_dir / "table_metrics_by_scenario.csv"
@@ -888,19 +890,48 @@ def save_outputs(
     (tables_dir / "table_metrics_overall_snippet.md").write_text(overall_md + "\n", encoding="utf-8")
     (tables_dir / "table_metrics_overall_snippet.tex").write_text(overall_tex + "\n", encoding="utf-8")
 
-    plot_cdf_abs_angle_error(result_df, method_cols, figs_dir / "cdf_abs_angle_error.png")
-    plot_scatter_pred_vs_true_angle(result_df, method_cols, figs_dir / "scatter_pred_vs_true_angle.png")
-    plot_boxplot_angle_error_by_scenario(
-        result_df,
-        method_cols,
-        figs_dir / "boxplot_angle_error_by_scenario.png",
-    )
-    plot_boxplot_angle_error_by_bin(
-        result_df,
-        method_cols,
-        figs_dir / "boxplot_angle_error_by_bin.png",
-    )
-    plot_polar_mean_error(result_df, method_cols, figs_dir / "polar_mean_error.png")
+    generated_artifacts = [
+        "- tables/table_metrics_overall.csv",
+        "- tables/table_metrics_by_scenario.csv",
+        "- tables/table_metrics_by_angle_bin.csv",
+    ]
+    expected_files = [
+        tables_dir / "table_metrics_overall.csv",
+        tables_dir / "table_metrics_by_scenario.csv",
+        tables_dir / "table_metrics_by_angle_bin.csv",
+    ]
+    if plots_available:
+        plot_cdf_abs_angle_error(result_df, method_cols, figs_dir / "cdf_abs_angle_error.png")
+        plot_scatter_pred_vs_true_angle(result_df, method_cols, figs_dir / "scatter_pred_vs_true_angle.png")
+        plot_boxplot_angle_error_by_scenario(
+            result_df,
+            method_cols,
+            figs_dir / "boxplot_angle_error_by_scenario.png",
+        )
+        plot_boxplot_angle_error_by_bin(
+            result_df,
+            method_cols,
+            figs_dir / "boxplot_angle_error_by_bin.png",
+        )
+        plot_polar_mean_error(result_df, method_cols, figs_dir / "polar_mean_error.png")
+        generated_artifacts.extend(
+            [
+                "- figs/cdf_abs_angle_error.png",
+                "- figs/scatter_pred_vs_true_angle.png",
+                "- figs/boxplot_angle_error_by_scenario.png",
+                "- figs/boxplot_angle_error_by_bin.png",
+                "- figs/polar_mean_error.png",
+            ]
+        )
+        expected_files.extend(
+            [
+                figs_dir / "cdf_abs_angle_error.png",
+                figs_dir / "scatter_pred_vs_true_angle.png",
+                figs_dir / "boxplot_angle_error_by_scenario.png",
+                figs_dir / "boxplot_angle_error_by_bin.png",
+                figs_dir / "polar_mean_error.png",
+            ]
+        )
 
     train_groups = sorted(frame.iloc[train_idx][group_col].astype(str).unique().tolist())
     test_groups = sorted(frame.iloc[test_idx][group_col].astype(str).unique().tolist())
@@ -934,6 +965,14 @@ def save_outputs(
                     f"- `{run_id_conflict_count}` packet rows had conflicting in-record `run_id` metadata. "
                     "The analysis used the path-derived `run_<id>` as authoritative."
                 ),
+                "",
+            ]
+        )
+    if not plots_available:
+        report_lines.extend(
+            [
+                "## Plot Generation Note",
+                "- Figure generation was skipped because matplotlib is unavailable in the local Python stack.",
                 "",
             ]
         )
@@ -972,29 +1011,12 @@ def save_outputs(
         "```",
         "",
         "## Generated Artifacts",
-        "- tables/table_metrics_overall.csv",
-        "- tables/table_metrics_by_scenario.csv",
-        "- tables/table_metrics_by_angle_bin.csv",
-        "- figs/cdf_abs_angle_error.png",
-        "- figs/scatter_pred_vs_true_angle.png",
-        "- figs/boxplot_angle_error_by_scenario.png",
-        "- figs/boxplot_angle_error_by_bin.png",
-        "- figs/polar_mean_error.png",
+        *generated_artifacts,
     ]
     )
     (out_dir / "report.md").write_text("\n".join(report_lines) + "\n", encoding="utf-8")
 
-    expected_files = [
-        tables_dir / "table_metrics_overall.csv",
-        tables_dir / "table_metrics_by_scenario.csv",
-        tables_dir / "table_metrics_by_angle_bin.csv",
-        figs_dir / "cdf_abs_angle_error.png",
-        figs_dir / "scatter_pred_vs_true_angle.png",
-        figs_dir / "boxplot_angle_error_by_scenario.png",
-        figs_dir / "boxplot_angle_error_by_bin.png",
-        figs_dir / "polar_mean_error.png",
-        out_dir / "report.md",
-    ]
+    expected_files.append(out_dir / "report.md")
     missing = [str(path) for path in expected_files if not path.exists()]
     if missing:
         raise FileNotFoundError(f"Missing expected output files: {missing}")
@@ -1137,6 +1159,7 @@ def run_analysis(args: argparse.Namespace) -> None:
         group_col=args.group_col,
         pca_ratio=pca_ratio,
         csi_estimator_desc=csi_estimator_desc,
+        plots_available=MATPLOTLIB_AVAILABLE,
     )
 
     print("=== Dataset summary ===")
@@ -1160,7 +1183,6 @@ def main() -> None:
         )
 
     args = parse_args()
-    _require_plotting_stack()
     if not (0.0 < args.test_size < 1.0):
         raise ValueError("--test_size must be in (0, 1).")
     if args.knn_k < 1:
