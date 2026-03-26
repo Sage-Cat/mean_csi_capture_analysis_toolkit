@@ -14,10 +14,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import matplotlib
+try:
+    import matplotlib
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    MATPLOTLIB_AVAILABLE = True
+    MATPLOTLIB_IMPORT_ERROR = ""
+except Exception as exc:  # pragma: no cover - environment dependent
+    matplotlib = None
+    plt = None
+    MATPLOTLIB_AVAILABLE = False
+    MATPLOTLIB_IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -804,11 +813,13 @@ def save_outputs(
     seed: int,
     window_s: float,
     overlap: float,
+    plots_available: bool,
 ) -> None:
     tables_dir = out_dir / "tables"
     figs_dir = out_dir / "figs"
     tables_dir.mkdir(parents=True, exist_ok=True)
-    figs_dir.mkdir(parents=True, exist_ok=True)
+    if plots_available:
+        figs_dir.mkdir(parents=True, exist_ok=True)
 
     dataset_summary_df.to_csv(tables_dir / "table_dataset_summary.csv", index=False)
     run_df.to_csv(tables_dir / "table_run_summary.csv", index=False)
@@ -831,40 +842,41 @@ def save_outputs(
         encoding="utf-8",
     )
 
-    plot_boxplot(
-        window_df,
-        feature="mean_rssi",
-        title="Window Mean RSSI by Label",
-        out_path=figs_dir / "boxplot_mean_rssi_by_label.png",
-    )
-    plot_boxplot(
-        window_df,
-        feature="mean_amp",
-        title="Window Mean CSI Amplitude by Label",
-        out_path=figs_dir / "boxplot_mean_amp_by_label.png",
-    )
-    plot_effect_sizes(effect_df, figs_dir / "feature_effect_sizes.png")
-    plot_pca_windows(window_df, train_idx=train_idx, seed=seed, out_path=figs_dir / "pca_windows.png")
-    plot_example_timeseries(window_df, figs_dir / "timeseries_example_runs.png")
-
     best_method = str(overall_df.iloc[0]["method"])
-    cm = np.asarray(artifacts["confusion_matrices"][best_method], dtype=int)
-    plot_confusion_matrix_figure(
-        cm,
-        figs_dir / "confusion_matrix_best_model.png",
-        title=f"Confusion Matrix ({best_method})",
-    )
-
-    best_predictions = prediction_df.loc[prediction_df["method"] == best_method].copy()
-    best_scores = best_predictions["score_hands_up"].to_numpy(dtype=float)
-    if np.isfinite(best_scores).any():
-        y_true = best_predictions["label"].astype(str).to_numpy()
-        plot_roc_curve_figure(
-            y_true,
-            best_scores,
-            figs_dir / "roc_curve_best_model.png",
-            title=f"ROC Curve ({best_method})",
+    if plots_available:
+        plot_boxplot(
+            window_df,
+            feature="mean_rssi",
+            title="Window Mean RSSI by Label",
+            out_path=figs_dir / "boxplot_mean_rssi_by_label.png",
         )
+        plot_boxplot(
+            window_df,
+            feature="mean_amp",
+            title="Window Mean CSI Amplitude by Label",
+            out_path=figs_dir / "boxplot_mean_amp_by_label.png",
+        )
+        plot_effect_sizes(effect_df, figs_dir / "feature_effect_sizes.png")
+        plot_pca_windows(window_df, train_idx=train_idx, seed=seed, out_path=figs_dir / "pca_windows.png")
+        plot_example_timeseries(window_df, figs_dir / "timeseries_example_runs.png")
+
+        cm = np.asarray(artifacts["confusion_matrices"][best_method], dtype=int)
+        plot_confusion_matrix_figure(
+            cm,
+            figs_dir / "confusion_matrix_best_model.png",
+            title=f"Confusion Matrix ({best_method})",
+        )
+
+        best_predictions = prediction_df.loc[prediction_df["method"] == best_method].copy()
+        best_scores = best_predictions["score_hands_up"].to_numpy(dtype=float)
+        if np.isfinite(best_scores).any():
+            y_true = best_predictions["label"].astype(str).to_numpy()
+            plot_roc_curve_figure(
+                y_true,
+                best_scores,
+                figs_dir / "roc_curve_best_model.png",
+                title=f"ROC Curve ({best_method})",
+            )
 
     split_train = split_df.loc[split_df["phase"] == "train", "run_id"].astype(str).tolist()
     split_test = split_df.loc[split_df["phase"] == "test", "run_id"].astype(str).tolist()
@@ -966,14 +978,30 @@ def save_outputs(
         "- `tables/table_metrics_overall.csv`",
         "- `tables/table_metrics_by_run.csv`",
         "- `tables/table_predictions_test.csv`",
-        "- `figs/boxplot_mean_rssi_by_label.png`",
-        "- `figs/boxplot_mean_amp_by_label.png`",
-        "- `figs/feature_effect_sizes.png`",
-        "- `figs/pca_windows.png`",
-        "- `figs/confusion_matrix_best_model.png`",
-        "- `figs/roc_curve_best_model.png`",
-        "- `figs/timeseries_example_runs.png`",
     ]
+    if not plots_available:
+        report_lines.extend(
+            [
+                "",
+                "## Plot Generation Note",
+                (
+                    "- Figure generation was skipped because matplotlib is unavailable in the local "
+                    f"Python stack (`{MATPLOTLIB_IMPORT_ERROR}`)."
+                ),
+            ]
+        )
+    else:
+        report_lines.extend(
+            [
+                "- `figs/boxplot_mean_rssi_by_label.png`",
+                "- `figs/boxplot_mean_amp_by_label.png`",
+                "- `figs/feature_effect_sizes.png`",
+                "- `figs/pca_windows.png`",
+                "- `figs/confusion_matrix_best_model.png`",
+                "- `figs/roc_curve_best_model.png`",
+                "- `figs/timeseries_example_runs.png`",
+            ]
+        )
     (out_dir / "report.md").write_text("\n".join(report_lines) + "\n", encoding="utf-8")
 
 
@@ -1013,6 +1041,7 @@ def run_analysis(args: argparse.Namespace) -> None:
         seed=args.seed,
         window_s=args.window_s,
         overlap=args.overlap,
+        plots_available=MATPLOTLIB_AVAILABLE,
     )
 
     print("=== Dataset summary ===")
