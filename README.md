@@ -23,6 +23,14 @@ data/                     # Small reusable sample data only
 
 `experiments/`, `out/`, and build files are intentionally ignored so students can run scripts locally without polluting git history.
 
+Full local analysis pass across the mounted experiment datasets:
+
+```bash
+make analyze-suite
+```
+
+This runs the full distance, stability, angle, static-gesture, and obstacle analyzers, then writes a consolidated suite summary under `out/experiment_analysis_suite/`.
+
 ## 1) System Dependencies (Both Laptops)
 
 Linux (Ubuntu/Debian):
