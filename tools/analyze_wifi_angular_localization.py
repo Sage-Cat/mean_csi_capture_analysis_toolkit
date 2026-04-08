@@ -605,7 +605,6 @@ def plot_cdf_abs_angle_error(result_df: pd.DataFrame, method_cols: dict[str, str
 
     plt.xlabel("|Angle error| (deg)")
     plt.ylabel("CDF")
-    plt.title("CDF of Absolute Angle Error")
     plt.xlim(left=0.0)
     plt.grid(True, alpha=0.3)
     plt.legend()
@@ -660,7 +659,6 @@ def plot_scatter_pred_vs_true_angle(
 
     plt.xlim(min_a - pad, max_a + pad)
     plt.ylim(min_a - pad, max_a + pad)
-    fig.suptitle("Predicted vs True Angle")
     fig.tight_layout()
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
