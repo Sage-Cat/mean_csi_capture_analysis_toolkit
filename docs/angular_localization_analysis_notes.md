@@ -22,6 +22,7 @@ python tools/analyze_wifi_angular_localization.py \
 Optional flags:
 
 - `--group_col <name>`: leakage-safe split grouping (default: `group_id`).
+- `--eval_mode <group_holdout|leave_one_group_out>`: single grouped split or repeated leave-one-group-out evaluation.
 - `--test_size <float>`: grouped test split fraction (default: `0.3`).
 - `--angle_bins "-60,-45,-30,-15,0,15,30,45,60"`: evaluation bin centers.
 - `--use_pca`: use summary+PCA features only for CSI models.
@@ -39,9 +40,11 @@ The parser auto-extracts scenario base (`LoS`, `NLoS_human`, etc.) and angle fro
 
 ## Leakage control
 
-- Uses grouped split (`GroupShuffleSplit` when sklearn is installed).
+- Uses grouped split (`GroupShuffleSplit` when sklearn is installed) or repeated leave-one-group-out evaluation over the selected grouping column.
 - Default grouping key `group_id` is:
   `run_id | scenario_base | angle_deg`.
+- For repeated-run studies with complete angle sweeps in each run, use:
+  `--group_col run_id --eval_mode leave_one_group_out`.
 - PCA/scaling/model fitting are train-only; test data is transformed with train-fitted objects.
 
 ## Metrics
@@ -63,10 +66,12 @@ All angle errors are computed as wrapped circular difference in `[-180, 180)`.
 ## Outputs
 
 - `out/angular_localization/tables/table_metrics_overall.csv`
+- `out/angular_localization/tables/table_metrics_by_fold.csv`
 - `out/angular_localization/tables/table_metrics_by_scenario.csv`
 - `out/angular_localization/tables/table_metrics_by_angle_bin.csv`
 - `out/angular_localization/figs/cdf_abs_angle_error.png`
 - `out/angular_localization/figs/scatter_pred_vs_true_angle.png`
+- `out/angular_localization/figs/mae_by_angle_bin.png`
 - `out/angular_localization/figs/boxplot_angle_error_by_scenario.png`
 - `out/angular_localization/figs/boxplot_angle_error_by_bin.png`
 - `out/angular_localization/figs/polar_mean_error.png`

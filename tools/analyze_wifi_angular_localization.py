@@ -116,6 +116,15 @@ def parse_args() -> argparse.Namespace:
         help="Grouping column for leakage-safe split (default: group_id=run|scenario|angle).",
     )
     parser.add_argument(
+        "--eval_mode",
+        choices=("group_holdout", "leave_one_group_out"),
+        default="group_holdout",
+        help=(
+            "Evaluation protocol: one grouped holdout split or repeated leave-one-group-out "
+            "evaluation over the selected grouping column."
+        ),
+    )
+    parser.add_argument(
         "--downsample_step",
         type=int,
         default=4,
@@ -395,6 +404,56 @@ def grouped_split(
 
 
 
+def build_eval_splits(
+    frame: pd.DataFrame,
+    group_col: str,
+    test_size: float,
+    seed: int,
+    eval_mode: str,
+) -> list[dict[str, Any]]:
+    """Construct evaluation splits for the selected protocol."""
+    groups = frame[group_col].astype(str)
+    if eval_mode == "group_holdout":
+        train_idx, test_idx = grouped_split(frame=frame, group_col=group_col, test_size=test_size, seed=seed)
+        return [
+            {
+                "fold_id": "split_1",
+                "train_idx": train_idx,
+                "test_idx": test_idx,
+                "train_groups": sorted(frame.iloc[train_idx][group_col].astype(str).unique().tolist()),
+                "test_groups": sorted(frame.iloc[test_idx][group_col].astype(str).unique().tolist()),
+            }
+        ]
+
+    unique_groups = sorted(groups.unique().tolist())
+    if len(unique_groups) < 2:
+        raise ValueError(
+            f"Need at least 2 unique groups in '{group_col}' for leave-one-group-out evaluation."
+        )
+
+    splits: list[dict[str, Any]] = []
+    for group_value in unique_groups:
+        test_mask = groups.eq(group_value).to_numpy()
+        train_idx = np.where(~test_mask)[0]
+        test_idx = np.where(test_mask)[0]
+        if train_idx.size == 0 or test_idx.size == 0:
+            raise ValueError(
+                f"Leave-one-group-out split for '{group_value}' produced an empty partition."
+            )
+        safe_group = re.sub(r"[^A-Za-z0-9._-]+", "_", group_value)
+        splits.append(
+            {
+                "fold_id": f"holdout_{safe_group}",
+                "train_idx": train_idx,
+                "test_idx": test_idx,
+                "train_groups": sorted(frame.iloc[train_idx][group_col].astype(str).unique().tolist()),
+                "test_groups": [group_value],
+            }
+        )
+    return splits
+
+
+
 def compute_pca_components(
     amp_matrix: np.ndarray, train_idx: np.ndarray, n_components: int = 3
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -592,16 +651,61 @@ def summarize_metrics(
 
 
 
+def summarize_metrics_by_fold(result_df: pd.DataFrame, method_cols: dict[str, str]) -> pd.DataFrame:
+    """Create per-fold metrics table."""
+    fold_rows: list[dict[str, Any]] = []
+    for fold_id, fold_group in result_df.groupby("fold_id", sort=True):
+        y_true = fold_group["angle_deg"].to_numpy(dtype=float)
+        test_groups_label = fold_group["fold_test_groups"].iloc[0]
+        for method, pred_col in method_cols.items():
+            y_pred = fold_group[pred_col].to_numpy(dtype=float)
+            row = {
+                "fold_id": fold_id,
+                "test_groups": test_groups_label,
+                "method": method,
+            }
+            row.update(metrics_from_predictions(y_true, y_pred))
+            fold_rows.append(row)
+    return (
+        pd.DataFrame(fold_rows)
+        .sort_values(by=["fold_id", "MAE_deg", "RMSE_deg"])
+        .reset_index(drop=True)
+    )
+
+
+
+def method_plot_styles() -> dict[str, dict[str, Any]]:
+    """Monochrome line styles for publication-safe plots."""
+    return {
+        METHOD_RSSI_LINEAR: {"color": "black", "linestyle": ":", "marker": "s"},
+        METHOD_RSSI_POLY2: {"color": "dimgray", "linestyle": "--", "marker": "^"},
+        METHOD_CSI_KNN: {"color": "black", "linestyle": "-", "marker": "o"},
+        METHOD_FUSION_KNN: {"color": "gray", "linestyle": "-.", "marker": "D"},
+        METHOD_CSI_RIDGE_FALLBACK: {"color": "black", "linestyle": "-", "marker": "o"},
+        METHOD_FUSION_RIDGE_FALLBACK: {"color": "gray", "linestyle": "-.", "marker": "D"},
+    }
+
+
+
 def plot_cdf_abs_angle_error(result_df: pd.DataFrame, method_cols: dict[str, str], out_path: Path) -> None:
     """Plot empirical CDF of absolute angle errors."""
     plt.figure(figsize=(8, 5))
+    styles = method_plot_styles()
     for method, pred_col in method_cols.items():
         err = wrap_angle_deg(
             result_df[pred_col].to_numpy(dtype=float) - result_df["angle_deg"].to_numpy(dtype=float)
         )
         abs_err = np.sort(np.abs(err))
         cdf = np.arange(1, abs_err.size + 1) / abs_err.size
-        plt.plot(abs_err, cdf, linewidth=2, label=method)
+        style = styles.get(method, {"color": "black", "linestyle": "-", "marker": None})
+        plt.plot(
+            abs_err,
+            cdf,
+            linewidth=2,
+            label=method_short_label(method),
+            color=style["color"],
+            linestyle=style["linestyle"],
+        )
 
     plt.xlabel("|Angle error| (deg)")
     plt.ylabel("CDF")
@@ -637,16 +741,15 @@ def plot_scatter_pred_vs_true_angle(
         error = wrap_angle_deg(y_pred_raw - y_true)
         mae = float(np.mean(np.abs(error)))
 
-        axis.scatter(y_true, y_pred, s=10, alpha=0.25)
-        axis.plot(grid, grid, color="black", linestyle="--", linewidth=1)
-        axis.set_title(method)
+        axis.scatter(y_true, y_pred, s=10, alpha=0.22, color="black")
+        axis.plot(grid, grid, color="gray", linestyle="--", linewidth=1)
         axis.set_xlabel("True angle (deg)")
         axis.set_ylabel("Predicted angle (deg)")
         axis.grid(True, alpha=0.3)
         axis.text(
             0.02,
             0.98,
-            f"MAE={mae:.2f} deg",
+            f"{method_short_label(method)}\nMAE={mae:.2f} deg",
             transform=axis.transAxes,
             ha="left",
             va="top",
@@ -662,6 +765,35 @@ def plot_scatter_pred_vs_true_angle(
     fig.tight_layout()
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
+
+
+
+def plot_mae_by_angle_bin(bin_df: pd.DataFrame, out_path: Path) -> None:
+    """Plot per-angle MAE for each method."""
+    plt.figure(figsize=(8, 4.4))
+    styles = method_plot_styles()
+    for method in bin_df["method"].astype(str).unique():
+        subset = bin_df[bin_df["method"] == method].sort_values(by="angle_bin_deg")
+        style = styles.get(method, {"color": "black", "linestyle": "-", "marker": "o"})
+        plt.plot(
+            subset["angle_bin_deg"].to_numpy(dtype=float),
+            subset["MAE_deg"].to_numpy(dtype=float),
+            label=method_short_label(method),
+            color=style["color"],
+            linestyle=style["linestyle"],
+            marker=style["marker"],
+            linewidth=1.8,
+            markersize=5,
+        )
+
+    plt.xlabel("Angle (deg)")
+    plt.ylabel("MAE (deg)")
+    plt.xticks(sorted(bin_df["angle_bin_deg"].astype(float).unique().tolist()))
+    plt.grid(True, alpha=0.3)
+    plt.legend(ncol=2, frameon=False)
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=300)
+    plt.close()
 
 
 
@@ -857,14 +989,14 @@ def save_outputs(
     frame: pd.DataFrame,
     result_df: pd.DataFrame,
     overall_df: pd.DataFrame,
+    fold_df: pd.DataFrame,
     scenario_df: pd.DataFrame,
     bin_df: pd.DataFrame,
     method_cols: dict[str, str],
     out_dir: Path,
-    train_idx: np.ndarray,
-    test_idx: np.ndarray,
+    split_summaries: list[dict[str, Any]],
     group_col: str,
-    pca_ratio: np.ndarray,
+    eval_mode: str,
     csi_estimator_desc: str,
     plots_available: bool,
 ) -> None:
@@ -876,10 +1008,12 @@ def save_outputs(
         figs_dir.mkdir(parents=True, exist_ok=True)
 
     overall_path = tables_dir / "table_metrics_overall.csv"
+    fold_path = tables_dir / "table_metrics_by_fold.csv"
     scenario_path = tables_dir / "table_metrics_by_scenario.csv"
     bin_path = tables_dir / "table_metrics_by_angle_bin.csv"
 
     overall_df.to_csv(overall_path, index=False)
+    fold_df.to_csv(fold_path, index=False)
     scenario_df.to_csv(scenario_path, index=False)
     bin_df.to_csv(bin_path, index=False)
 
@@ -890,17 +1024,20 @@ def save_outputs(
 
     generated_artifacts = [
         "- tables/table_metrics_overall.csv",
+        "- tables/table_metrics_by_fold.csv",
         "- tables/table_metrics_by_scenario.csv",
         "- tables/table_metrics_by_angle_bin.csv",
     ]
     expected_files = [
         tables_dir / "table_metrics_overall.csv",
+        tables_dir / "table_metrics_by_fold.csv",
         tables_dir / "table_metrics_by_scenario.csv",
         tables_dir / "table_metrics_by_angle_bin.csv",
     ]
     if plots_available:
         plot_cdf_abs_angle_error(result_df, method_cols, figs_dir / "cdf_abs_angle_error.png")
         plot_scatter_pred_vs_true_angle(result_df, method_cols, figs_dir / "scatter_pred_vs_true_angle.png")
+        plot_mae_by_angle_bin(bin_df, figs_dir / "mae_by_angle_bin.png")
         plot_boxplot_angle_error_by_scenario(
             result_df,
             method_cols,
@@ -916,6 +1053,7 @@ def save_outputs(
             [
                 "- figs/cdf_abs_angle_error.png",
                 "- figs/scatter_pred_vs_true_angle.png",
+                "- figs/mae_by_angle_bin.png",
                 "- figs/boxplot_angle_error_by_scenario.png",
                 "- figs/boxplot_angle_error_by_bin.png",
                 "- figs/polar_mean_error.png",
@@ -925,14 +1063,13 @@ def save_outputs(
             [
                 figs_dir / "cdf_abs_angle_error.png",
                 figs_dir / "scatter_pred_vs_true_angle.png",
+                figs_dir / "mae_by_angle_bin.png",
                 figs_dir / "boxplot_angle_error_by_scenario.png",
                 figs_dir / "boxplot_angle_error_by_bin.png",
                 figs_dir / "polar_mean_error.png",
             ]
         )
 
-    train_groups = sorted(frame.iloc[train_idx][group_col].astype(str).unique().tolist())
-    test_groups = sorted(frame.iloc[test_idx][group_col].astype(str).unique().tolist())
     run_id_conflict_count = 0
     if {"record_run_id", "path_run_id"}.issubset(frame.columns):
         mismatch_mask = (
@@ -975,14 +1112,59 @@ def save_outputs(
             ]
         )
 
+    if eval_mode == "group_holdout":
+        protocol_title = "## Leakage-Safe Split"
+        protocol_lines = [
+            f"- Evaluation mode: {eval_mode}",
+            f"- Group column: `{group_col}`",
+            (
+                f"- Train groups ({len(split_summaries[0]['train_groups'])}): "
+                + ", ".join(split_summaries[0]["train_groups"])
+            ),
+            (
+                f"- Test groups ({len(split_summaries[0]['test_groups'])}): "
+                + ", ".join(split_summaries[0]["test_groups"])
+            ),
+            f"- Train packets: {split_summaries[0]['train_packets']:,}",
+            f"- Test packets: {split_summaries[0]['test_packets']:,}",
+        ]
+        pca_lines = [
+            (
+                "- PCA (train fit only): explained ratio = "
+                + ", ".join(f"{value:.4f}" for value in split_summaries[0]["pca_ratio"])
+            )
+        ]
+    else:
+        protocol_title = "## Repeated-Run Evaluation"
+        protocol_lines = [
+            f"- Evaluation mode: {eval_mode}",
+            f"- Group column: `{group_col}`",
+            f"- Folds: {len(split_summaries)}",
+        ]
+        for split in split_summaries:
+            protocol_lines.append(
+                (
+                    f"- {split['fold_id']}: train groups ({len(split['train_groups'])}) = "
+                    f"{', '.join(split['train_groups'])}; test groups ({len(split['test_groups'])}) = "
+                    f"{', '.join(split['test_groups'])}; train packets = {split['train_packets']:,}; "
+                    f"test packets = {split['test_packets']:,}"
+                )
+            )
+        pca_lines = [
+            "- PCA (train fit only) by fold:",
+            *[
+                (
+                    f"  - {split['fold_id']}: "
+                    + ", ".join(f"{value:.4f}" for value in split["pca_ratio"])
+                )
+                for split in split_summaries
+            ],
+        ]
+
     report_lines.extend(
         [
-        "## Leakage-Safe Split",
-        f"- Group column: `{group_col}`",
-        f"- Train groups ({len(train_groups)}): {', '.join(train_groups)}",
-        f"- Test groups ({len(test_groups)}): {', '.join(test_groups)}",
-        f"- Train packets: {len(train_idx):,}",
-        f"- Test packets: {len(test_idx):,}",
+        protocol_title,
+        *protocol_lines,
         "",
         "## Models",
         f"- {METHOD_RSSI_LINEAR}: ridge/OLS on RSSI-only linear feature.",
@@ -991,7 +1173,7 @@ def save_outputs(
         "",
         "## Feature Pipeline",
         f"- CSI summary features: mean/std/median/topK amplitude, CSI pair count.",
-        f"- PCA (train fit only): explained ratio = {', '.join(f'{v:.4f}' for v in pca_ratio)}",
+        *pca_lines,
         "",
         "## Best Overall Method",
         (
@@ -1044,37 +1226,6 @@ def run_analysis(args: argparse.Namespace) -> None:
     frame["angle_bin_deg"] = assigned_bins
     frame["angle_bin_label"] = assigned_labels
 
-    train_idx, test_idx = grouped_split(
-        frame=frame,
-        group_col=args.group_col,
-        test_size=args.test_size,
-        seed=args.seed,
-    )
-    train_scenarios = set(frame.iloc[train_idx]["scenario_base"].astype(str).unique().tolist())
-    test_scenarios = set(frame.iloc[test_idx]["scenario_base"].astype(str).unique().tolist())
-    unseen_test_scenarios = sorted(test_scenarios - train_scenarios)
-    if unseen_test_scenarios:
-        LOGGER.warning(
-            "Test split contains scenarios unseen in train: %s",
-            ", ".join(unseen_test_scenarios),
-        )
-
-    train_angle_bins = set(frame.iloc[train_idx]["angle_bin_label"].astype(str).unique().tolist())
-    test_angle_bins = set(frame.iloc[test_idx]["angle_bin_label"].astype(str).unique().tolist())
-    unseen_test_bins = sorted(test_angle_bins - train_angle_bins)
-    if unseen_test_bins:
-        LOGGER.warning(
-            "Test split contains angle bins unseen in train: %s",
-            ", ".join(unseen_test_bins),
-        )
-
-    pca_components, pca_ratio = compute_pca_components(amp_matrix, train_idx, n_components=3)
-    frame[["pca_1", "pca_2", "pca_3"]] = pca_components
-    LOGGER.info(
-        "PCA explained variance ratio (train fit): %s",
-        ", ".join(f"{value:.4f}" for value in pca_ratio),
-    )
-
     if SKLEARN_AVAILABLE:
         method_csi = METHOD_CSI_KNN
         method_fusion = METHOD_FUSION_KNN
@@ -1087,54 +1238,6 @@ def run_analysis(args: argparse.Namespace) -> None:
             "(scikit-learn unavailable)."
         )
 
-    y = frame["angle_deg"].to_numpy(dtype=np.float32)
-    rssi = frame["rssi_dbm"].to_numpy(dtype=np.float32)
-    rssi_med = frame["rssi_dbm_median_burst"].to_numpy(dtype=np.float32)
-
-    x_rssi_linear = rssi.reshape(-1, 1)
-    x_rssi_poly2 = np.column_stack([rssi, rssi * rssi, rssi_med, rssi_med * rssi_med]).astype(
-        np.float32
-    )
-
-    x_csi = build_csi_feature_matrix(frame, amp_matrix, use_pca_only=args.use_pca)
-    x_fusion = build_fusion_feature_matrix(frame, x_csi)
-
-    pred_rssi_linear = fit_predict_ridge(
-        x_rssi_linear[train_idx], y[train_idx], x_rssi_linear[test_idx], alpha=0.0
-    )
-    pred_rssi_poly2 = fit_predict_ridge(
-        x_rssi_poly2[train_idx], y[train_idx], x_rssi_poly2[test_idx], alpha=1e-2
-    )
-    pred_csi = fit_predict_knn(
-        x_csi[train_idx],
-        y[train_idx],
-        x_csi[test_idx],
-        k=args.knn_k,
-    )
-    pred_fusion = fit_predict_knn(
-        x_fusion[train_idx],
-        y[train_idx],
-        x_fusion[test_idx],
-        k=args.knn_k,
-    )
-
-    result_df = frame.iloc[test_idx][
-        [
-            "angle_deg",
-            "angle_bin_deg",
-            "angle_bin_label",
-            "scenario_base",
-            "run_id",
-            "group_id",
-            "rssi_dbm",
-            "mean_amp",
-        ]
-    ].copy()
-    result_df["pred_rssi_linear"] = pred_rssi_linear
-    result_df["pred_rssi_poly2"] = pred_rssi_poly2
-    result_df["pred_csi"] = pred_csi
-    result_df["pred_fusion"] = pred_fusion
-
     method_cols = {
         METHOD_RSSI_LINEAR: "pred_rssi_linear",
         METHOD_RSSI_POLY2: "pred_rssi_poly2",
@@ -1142,20 +1245,123 @@ def run_analysis(args: argparse.Namespace) -> None:
         method_fusion: "pred_fusion",
     }
 
+    split_specs = build_eval_splits(
+        frame=frame,
+        group_col=args.group_col,
+        test_size=args.test_size,
+        seed=args.seed,
+        eval_mode=args.eval_mode,
+    )
+    result_frames: list[pd.DataFrame] = []
+    split_summaries: list[dict[str, Any]] = []
+    for split in split_specs:
+        train_idx = split["train_idx"]
+        test_idx = split["test_idx"]
+        train_scenarios = set(frame.iloc[train_idx]["scenario_base"].astype(str).unique().tolist())
+        test_scenarios = set(frame.iloc[test_idx]["scenario_base"].astype(str).unique().tolist())
+        unseen_test_scenarios = sorted(test_scenarios - train_scenarios)
+        if unseen_test_scenarios:
+            LOGGER.warning(
+                "Fold %s contains scenarios unseen in train: %s",
+                split["fold_id"],
+                ", ".join(unseen_test_scenarios),
+            )
+
+        train_angle_bins = set(frame.iloc[train_idx]["angle_bin_label"].astype(str).unique().tolist())
+        test_angle_bins = set(frame.iloc[test_idx]["angle_bin_label"].astype(str).unique().tolist())
+        unseen_test_bins = sorted(test_angle_bins - train_angle_bins)
+        if unseen_test_bins:
+            LOGGER.warning(
+                "Fold %s contains angle bins unseen in train: %s",
+                split["fold_id"],
+                ", ".join(unseen_test_bins),
+            )
+
+        pca_components, pca_ratio = compute_pca_components(amp_matrix, train_idx, n_components=3)
+        frame_with_pca = frame.copy()
+        frame_with_pca[["pca_1", "pca_2", "pca_3"]] = pca_components
+        LOGGER.info(
+            "Fold %s PCA explained variance ratio (train fit): %s",
+            split["fold_id"],
+            ", ".join(f"{value:.4f}" for value in pca_ratio),
+        )
+
+        y = frame_with_pca["angle_deg"].to_numpy(dtype=np.float32)
+        rssi = frame_with_pca["rssi_dbm"].to_numpy(dtype=np.float32)
+        rssi_med = frame_with_pca["rssi_dbm_median_burst"].to_numpy(dtype=np.float32)
+        x_rssi_linear = rssi.reshape(-1, 1)
+        x_rssi_poly2 = np.column_stack(
+            [rssi, rssi * rssi, rssi_med, rssi_med * rssi_med]
+        ).astype(np.float32)
+        x_csi = build_csi_feature_matrix(frame_with_pca, amp_matrix, use_pca_only=args.use_pca)
+        x_fusion = build_fusion_feature_matrix(frame_with_pca, x_csi)
+
+        pred_rssi_linear = fit_predict_ridge(
+            x_rssi_linear[train_idx], y[train_idx], x_rssi_linear[test_idx], alpha=0.0
+        )
+        pred_rssi_poly2 = fit_predict_ridge(
+            x_rssi_poly2[train_idx], y[train_idx], x_rssi_poly2[test_idx], alpha=1e-2
+        )
+        pred_csi = fit_predict_knn(
+            x_csi[train_idx],
+            y[train_idx],
+            x_csi[test_idx],
+            k=args.knn_k,
+        )
+        pred_fusion = fit_predict_knn(
+            x_fusion[train_idx],
+            y[train_idx],
+            x_fusion[test_idx],
+            k=args.knn_k,
+        )
+
+        fold_result_df = frame_with_pca.iloc[test_idx][
+            [
+                "angle_deg",
+                "angle_bin_deg",
+                "angle_bin_label",
+                "scenario_base",
+                "run_id",
+                "group_id",
+                "rssi_dbm",
+                "mean_amp",
+            ]
+        ].copy()
+        fold_result_df["fold_id"] = split["fold_id"]
+        fold_result_df["fold_test_groups"] = ", ".join(split["test_groups"])
+        fold_result_df["pred_rssi_linear"] = pred_rssi_linear
+        fold_result_df["pred_rssi_poly2"] = pred_rssi_poly2
+        fold_result_df["pred_csi"] = pred_csi
+        fold_result_df["pred_fusion"] = pred_fusion
+        result_frames.append(fold_result_df)
+
+        split_summaries.append(
+            {
+                "fold_id": split["fold_id"],
+                "train_groups": split["train_groups"],
+                "test_groups": split["test_groups"],
+                "train_packets": int(len(train_idx)),
+                "test_packets": int(len(test_idx)),
+                "pca_ratio": pca_ratio.astype(float).tolist(),
+            }
+        )
+
+    result_df = pd.concat(result_frames, ignore_index=True)
     overall_df, scenario_df, bin_df = summarize_metrics(result_df, method_cols)
+    fold_df = summarize_metrics_by_fold(result_df, method_cols)
 
     save_outputs(
         frame=frame,
         result_df=result_df,
         overall_df=overall_df,
+        fold_df=fold_df,
         scenario_df=scenario_df,
         bin_df=bin_df,
         method_cols=method_cols,
         out_dir=out_dir,
-        train_idx=train_idx,
-        test_idx=test_idx,
+        split_summaries=split_summaries,
         group_col=args.group_col,
-        pca_ratio=pca_ratio,
+        eval_mode=args.eval_mode,
         csi_estimator_desc=csi_estimator_desc,
         plots_available=MATPLOTLIB_AVAILABLE,
     )
@@ -1165,8 +1371,13 @@ def run_analysis(args: argparse.Namespace) -> None:
         f"rows={len(frame)}, scenarios={sorted(frame['scenario_base'].unique())}, "
         f"angles={sorted(frame['angle_deg'].unique())}, runs={sorted(frame['run_id'].unique())}"
     )
-    print(f"train_rows={len(train_idx)}, test_rows={len(test_idx)}")
-    print("=== Overall metrics (test split) ===")
+    print(f"eval_mode={args.eval_mode}, folds={len(split_summaries)}")
+    for split in split_summaries:
+        print(
+            f"{split['fold_id']}: train_rows={split['train_packets']}, test_rows={split['test_packets']}, "
+            f"test_groups={split['test_groups']}"
+        )
+    print("=== Overall metrics (all out-of-fold predictions) ===")
     print(overall_df.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
     print(f"Outputs written to: {out_dir}")
 
