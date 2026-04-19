@@ -657,40 +657,66 @@ def plot_ml_confusion_matrix(
     plt.close(fig)
 
 
-def plot_ml_metrics(
-    per_class_df: pd.DataFrame,
+def plot_core_feature_separation(
+    window_df: pd.DataFrame,
     *,
     class_order: list[str],
-    title: str | None,
     out_path: Path,
 ) -> None:
-    metric_names = ["precision", "recall", "f1_score"]
-    metric_labels = ["Precision", "Recall", "F1"]
     display_map = {
-        str(row.scenario_id): str(row.scenario_display)
-        for row in per_class_df.itertuples(index=False)
+        scenario_id: str(window_df.loc[window_df["scenario_id"] == scenario_id, "scenario_display"].iloc[0])
+        for scenario_id in class_order
     }
-    ordered = per_class_df.set_index("scenario_id").loc[class_order].reset_index()
-    x = np.arange(len(class_order))
-    width = 0.22
+    subset = window_df.loc[window_df["scenario_id"].isin(class_order)].copy()
+    labels = [display_map[scenario_id].replace(" ", "\n") for scenario_id in class_order]
+    colors = ["#355070", "#6d597a", "#b56576", "#e56b6f"]
+    metrics = [
+        ("rssi_mean", "Window RSSI mean (dBm)", False),
+        ("mean_amp_mean", "Window CSI mean amplitude (log scale)", True),
+    ]
+    rng = np.random.default_rng(42)
 
-    fig, ax = plt.subplots(figsize=(7.2, 4.8))
-    colors = ["#375a7f", "#2a9d8f", "#e76f51"]
-    for idx, (metric_name, metric_label, color) in enumerate(zip(metric_names, metric_labels, colors)):
-        ax.bar(
-            x + (idx - 1) * width,
-            ordered[metric_name].to_numpy(dtype=float),
-            width=width,
-            label=metric_label,
-            color=color,
+    fig, axes = plt.subplots(1, 2, figsize=(8.4, 4.8))
+    for ax, (metric_name, ylabel, use_log_scale) in zip(axes, metrics):
+        data: list[np.ndarray] = []
+        for idx, scenario_id in enumerate(class_order, start=1):
+            values = subset.loc[subset["scenario_id"] == scenario_id, metric_name].to_numpy(dtype=float)
+            if use_log_scale:
+                values = np.clip(values, 1e-4, None)
+            data.append(values)
+            jitter = rng.uniform(-0.14, 0.14, size=values.size)
+            ax.scatter(
+                np.full(values.size, idx, dtype=float) + jitter,
+                values,
+                s=10,
+                alpha=0.25,
+                color=colors[idx - 1],
+                edgecolors="none",
+                rasterized=True,
+            )
+
+        boxplot = ax.boxplot(
+            data,
+            tick_labels=labels,
+            widths=0.55,
+            patch_artist=True,
+            showfliers=False,
+            medianprops={"color": "black", "linewidth": 1.1},
+            whiskerprops={"linewidth": 1.0},
+            capprops={"linewidth": 1.0},
         )
-    ax.set_xticks(x, [display_map[scenario_id] for scenario_id in class_order], rotation=20, ha="right")
-    ax.set_ylim(0.0, 1.05)
-    ax.set_ylabel("Score")
-    if title:
-        ax.set_title(title)
-    ax.grid(axis="y", alpha=0.3)
-    ax.legend(loc="lower left")
+        for patch, color in zip(boxplot["boxes"], colors):
+            patch.set_facecolor(color)
+            patch.set_alpha(0.45)
+            patch.set_linewidth(1.0)
+
+        if use_log_scale:
+            ax.set_yscale("log")
+        ax.set_ylabel(ylabel)
+        ax.grid(axis="y", alpha=0.3)
+        ax.tick_params(axis="x", labelsize=10)
+        ax.tick_params(axis="y", labelsize=10)
+
     fig.tight_layout()
     fig.savefig(out_path, dpi=300)
     plt.close(fig)
@@ -830,6 +856,7 @@ def main() -> None:
             predictions_df.to_csv(tables_dir / f"table_ml_predictions_{task_id}.csv", index=False)
 
     if MATPLOTLIB_AVAILABLE:
+        window_df = build_window_dataset(packet_df, args.window_size)
         plot_boxplot(
             packet_df,
             value_col="rssi_dbm",
@@ -845,11 +872,14 @@ def main() -> None:
             out_path=figs_dir / "boxplot_mean_amp_by_scenario.png",
         )
         if not ml_overall.empty:
-            plot_ml_metrics(
-                ml_per_class.loc[ml_per_class["task_id"] == "core_equal_distance"].copy(),
+            plot_core_feature_separation(
+                window_df.loc[
+                    window_df["scenario_id"].isin(
+                        ["s01_empty_space", "s05_door", "s03_one_wall", "s04_two_walls"]
+                    )
+                ].copy(),
                 class_order=["s01_empty_space", "s05_door", "s03_one_wall", "s04_two_walls"],
-                title=None,
-                out_path=figs_dir / "classification_metrics_core_equal_distance.png",
+                out_path=figs_dir / "feature_separation_core_equal_distance.png",
             )
             plot_ml_confusion_matrix(
                 ml_predictions["core_equal_distance"],
@@ -897,7 +927,7 @@ def main() -> None:
         if not ml_overall.empty:
             expected_files.extend(
                 [
-                    figs_dir / "classification_metrics_core_equal_distance.png",
+                    figs_dir / "feature_separation_core_equal_distance.png",
                     figs_dir / "confusion_matrix_core_equal_distance.png",
                 ]
             )
