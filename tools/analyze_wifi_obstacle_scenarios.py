@@ -586,7 +586,13 @@ def run_ml_evaluation(
     )
 
 
-def plot_boxplot(packet_df: pd.DataFrame, value_col: str, ylabel: str, title: str, out_path: Path) -> None:
+def plot_boxplot(
+    packet_df: pd.DataFrame,
+    value_col: str,
+    ylabel: str,
+    title: str | None,
+    out_path: Path,
+) -> None:
     order = sorted(packet_df["scenario_id"].astype(str).unique().tolist())
     labels = [
         _scenario_display_name(scenario_id).replace(" ", "\n")
@@ -596,7 +602,8 @@ def plot_boxplot(packet_df: pd.DataFrame, value_col: str, ylabel: str, title: st
     plt.figure(figsize=(9.5, 5.0))
     plt.boxplot(data, tick_labels=labels, showmeans=True, showfliers=False)
     plt.ylabel(ylabel)
-    plt.title(title)
+    if title:
+        plt.title(title)
     plt.grid(axis="y", alpha=0.3)
     plt.tight_layout()
     plt.savefig(out_path, dpi=300)
@@ -607,7 +614,7 @@ def plot_ml_confusion_matrix(
     predictions_df: pd.DataFrame,
     *,
     class_order: list[str],
-    title: str,
+    title: str | None,
     out_path: Path,
 ) -> None:
     class_names = [
@@ -630,7 +637,8 @@ def plot_ml_confusion_matrix(
     ax.set_yticks(range(len(class_names)), class_names)
     ax.set_xlabel("Predicted class")
     ax.set_ylabel("True class")
-    ax.set_title(title)
+    if title:
+        ax.set_title(title)
     for row_idx in range(cm.shape[0]):
         for col_idx in range(cm.shape[1]):
             value = normalized[row_idx, col_idx]
@@ -653,7 +661,7 @@ def plot_ml_metrics(
     per_class_df: pd.DataFrame,
     *,
     class_order: list[str],
-    title: str,
+    title: str | None,
     out_path: Path,
 ) -> None:
     metric_names = ["precision", "recall", "f1_score"]
@@ -679,7 +687,8 @@ def plot_ml_metrics(
     ax.set_xticks(x, [display_map[scenario_id] for scenario_id in class_order], rotation=20, ha="right")
     ax.set_ylim(0.0, 1.05)
     ax.set_ylabel("Score")
-    ax.set_title(title)
+    if title:
+        ax.set_title(title)
     ax.grid(axis="y", alpha=0.3)
     ax.legend(loc="lower left")
     fig.tight_layout()
@@ -825,27 +834,27 @@ def main() -> None:
             packet_df,
             value_col="rssi_dbm",
             ylabel="RSSI (dBm)",
-            title="Packet-Level RSSI by Obstacle Scenario",
+            title=None,
             out_path=figs_dir / "boxplot_rssi_by_scenario.png",
         )
         plot_boxplot(
             packet_df,
             value_col="mean_amp",
             ylabel="CSI mean_amp",
-            title="Packet-Level CSI mean_amp by Obstacle Scenario",
+            title=None,
             out_path=figs_dir / "boxplot_mean_amp_by_scenario.png",
         )
         if not ml_overall.empty:
             plot_ml_metrics(
                 ml_per_class.loc[ml_per_class["task_id"] == "core_equal_distance"].copy(),
                 class_order=["s01_empty_space", "s05_door", "s03_one_wall", "s04_two_walls"],
-                title="Equal-Distance Core Subset: Per-Class Precision/Recall/F1",
+                title=None,
                 out_path=figs_dir / "classification_metrics_core_equal_distance.png",
             )
             plot_ml_confusion_matrix(
                 ml_predictions["core_equal_distance"],
                 class_order=["s01_empty_space", "s05_door", "s03_one_wall", "s04_two_walls"],
-                title="Equal-Distance Core Subset: Leave-One-Run-Out Confusion Matrix",
+                title=None,
                 out_path=figs_dir / "confusion_matrix_core_equal_distance.png",
             )
 
