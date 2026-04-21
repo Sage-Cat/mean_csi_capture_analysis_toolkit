@@ -657,115 +657,6 @@ def plot_ml_confusion_matrix(
     plt.close(fig)
 
 
-def plot_core_stability_error_profile(
-    predictions_df: pd.DataFrame,
-    *,
-    class_order: list[str],
-    out_path: Path,
-) -> None:
-    short_label_map = {
-        "s01_empty_space": "E",
-        "s05_door": "D",
-        "s03_one_wall": "W1",
-        "s04_two_walls": "W2",
-    }
-    display_map = {
-        scenario_id: str(
-            predictions_df.loc[predictions_df["true_scenario_id"] == scenario_id, "true_scenario_display"].iloc[0]
-        )
-        for scenario_id in class_order
-    }
-    group_df = (
-        predictions_df.groupby(["true_scenario_id", "true_scenario_display", "run_id"], as_index=False)
-        .agg(
-            num_windows=("abs_error_steps", "size"),
-            exact_match_rate=("abs_error_steps", lambda s: float(np.mean(np.asarray(s, dtype=int) == 0))),
-            error_windows=("abs_error_steps", lambda s: int(np.sum(np.asarray(s, dtype=int) > 0))),
-        )
-        .copy()
-    )
-    group_df["class_order"] = group_df["true_scenario_id"].map({scenario_id: idx for idx, scenario_id in enumerate(class_order)})
-    group_df.sort_values(["class_order", "run_id"], inplace=True)
-
-    class_df = (
-        predictions_df.groupby(["true_scenario_id", "true_scenario_display"], as_index=False)
-        .agg(
-            total_windows=("abs_error_steps", "size"),
-            exact_windows=("abs_error_steps", lambda s: int(np.sum(np.asarray(s, dtype=int) == 0))),
-            one_step_errors=("abs_error_steps", lambda s: int(np.sum(np.asarray(s, dtype=int) == 1))),
-            larger_errors=("abs_error_steps", lambda s: int(np.sum(np.asarray(s, dtype=int) > 1))),
-        )
-        .copy()
-    )
-    class_df["class_order"] = class_df["true_scenario_id"].map({scenario_id: idx for idx, scenario_id in enumerate(class_order)})
-    class_df.sort_values("class_order", inplace=True)
-    class_df["exact_rate"] = class_df["exact_windows"] / class_df["total_windows"]
-    class_df["one_step_rate"] = class_df["one_step_errors"] / class_df["total_windows"]
-    class_df["larger_error_rate"] = class_df["larger_errors"] / class_df["total_windows"]
-
-    palette = {
-        "s01_empty_space": "#355070",
-        "s05_door": "#6d597a",
-        "s03_one_wall": "#b56576",
-        "s04_two_walls": "#e56b6f",
-    }
-
-    fig, axes = plt.subplots(1, 2, figsize=(8.2, 4.6))
-
-    ax = axes[0]
-    x_positions = np.arange(len(group_df), dtype=float)
-    ax.bar(
-        x_positions,
-        group_df["exact_match_rate"].to_numpy(dtype=float),
-        color=[palette.get(str(scenario_id), "#4c4c4c") for scenario_id in group_df["true_scenario_id"]],
-        width=0.72,
-    )
-    ax.set_ylim(0.40, 1.02)
-    ax.set_ylabel("Held-out group accuracy")
-    ax.set_xticks(
-        x_positions,
-        [f"{short_label_map.get(str(sid), display_map[str(sid)])}\nr{int(run_id)}" for sid, run_id in zip(group_df["true_scenario_id"], group_df["run_id"])],
-    )
-    ax.tick_params(axis="x", labelsize=8)
-    ax.grid(axis="y", alpha=0.3)
-    for xpos, rate, errors in zip(
-        x_positions,
-        group_df["exact_match_rate"].to_numpy(dtype=float),
-        group_df["error_windows"].to_numpy(dtype=int),
-    ):
-        if errors:
-            ax.text(xpos, rate + 0.01, f"-{errors}", ha="center", va="bottom", fontsize=8)
-
-    ax = axes[1]
-    y_positions = np.arange(len(class_df), dtype=float)
-    exact = class_df["exact_rate"].to_numpy(dtype=float)
-    one_step = class_df["one_step_rate"].to_numpy(dtype=float)
-    larger = class_df["larger_error_rate"].to_numpy(dtype=float)
-    ax.barh(y_positions, exact, color="#4c956c", label="Exact")
-    ax.barh(y_positions, one_step, left=exact, color="#f4a259", label="One-step error")
-    if np.any(larger > 0):
-        ax.barh(y_positions, larger, left=exact + one_step, color="#d1495b", label="Larger error")
-    ax.set_xlim(0.0, 1.0)
-    ax.set_xlabel("Window share")
-    ax.set_yticks(y_positions, [display_map[str(sid)] for sid in class_df["true_scenario_id"]])
-    ax.invert_yaxis()
-    ax.grid(axis="x", alpha=0.3)
-    for ypos, exact_rate, error_rate, total in zip(
-        y_positions,
-        exact,
-        one_step + larger,
-        class_df["total_windows"].to_numpy(dtype=int),
-    ):
-        ax.text(min(exact_rate / 2.0, 0.92), ypos, f"{100.0 * exact_rate:.1f}%", ha="center", va="center", fontsize=8, color="white")
-        if error_rate > 0:
-            ax.text(exact_rate + (error_rate / 2.0), ypos, f"{int(round(total * error_rate))}", ha="center", va="center", fontsize=8, color="black")
-    ax.legend(loc="upper right", fontsize=8, frameon=False)
-
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=300)
-    plt.close(fig)
-
-
 def plot_core_feature_separation(
     window_df: pd.DataFrame,
     *,
@@ -996,11 +887,6 @@ def main() -> None:
                 title=None,
                 out_path=figs_dir / "confusion_matrix_core_equal_distance.png",
             )
-            plot_core_stability_error_profile(
-                ml_predictions["core_equal_distance"],
-                class_order=["s01_empty_space", "s05_door", "s03_one_wall", "s04_two_walls"],
-                out_path=figs_dir / "stability_error_profile_core_equal_distance.png",
-            )
 
     write_report(
         out_path=out_dir / "report.md",
@@ -1043,7 +929,6 @@ def main() -> None:
                 [
                     figs_dir / "feature_separation_core_equal_distance.png",
                     figs_dir / "confusion_matrix_core_equal_distance.png",
-                    figs_dir / "stability_error_profile_core_equal_distance.png",
                 ]
             )
     missing = [str(path) for path in expected_files if not path.exists()]
