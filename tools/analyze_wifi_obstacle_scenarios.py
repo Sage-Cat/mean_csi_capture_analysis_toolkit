@@ -49,6 +49,13 @@ SCENARIO_SEVERITY_ORDER = {
     "s04_two_walls": 4,
 }
 
+PRIMARY_EQUAL_DISTANCE_SCENARIO_ORDER = [
+    "s01_empty_space",
+    "s05_door",
+    "s03_one_wall",
+    "s04_two_walls",
+]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -245,6 +252,20 @@ def build_dataset_summary(packet_df: pd.DataFrame, run_df: pd.DataFrame) -> pd.D
             }
         ]
     )
+
+
+def select_primary_equal_distance_subset(packet_df: pd.DataFrame, run_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    primary_set = set(PRIMARY_EQUAL_DISTANCE_SCENARIO_ORDER)
+    packet_subset = packet_df.loc[packet_df["scenario_id"].isin(primary_set)].copy()
+    run_subset = run_df.loc[run_df["scenario_id"].isin(primary_set)].copy()
+    missing = [scenario_id for scenario_id in PRIMARY_EQUAL_DISTANCE_SCENARIO_ORDER if scenario_id not in set(packet_subset["scenario_id"])]
+    if missing:
+        raise ValueError(f"Missing required equal-distance scenario(s): {missing}")
+    packet_subset.sort_values(["scenario_id", "run_id", "packet_idx"], inplace=True)
+    run_subset.sort_values(["scenario_id", "run_id"], inplace=True)
+    packet_subset.reset_index(drop=True, inplace=True)
+    run_subset.reset_index(drop=True, inplace=True)
+    return packet_subset, run_subset
 
 
 def build_scenario_summary(packet_df: pd.DataFrame, run_df: pd.DataFrame) -> pd.DataFrame:
@@ -556,13 +577,8 @@ def run_ml_evaluation(
         (
             "core_equal_distance",
             "Equal-distance core subset",
-            ["s01_empty_space", "s05_door", "s03_one_wall", "s04_two_walls"],
-        ),
-        (
-            "mixed_five_scenario",
-            "Mixed-distance five-scenario set",
-            ["s01_empty_space", "s02_chair_obstacle", "s05_door", "s03_one_wall", "s04_two_walls"],
-        ),
+            PRIMARY_EQUAL_DISTANCE_SCENARIO_ORDER,
+        )
     ]
 
     overall_frames: list[pd.DataFrame] = []
@@ -870,6 +886,7 @@ def write_report(
     mean_amp_rows = ordering_stability.loc[ordering_stability["metric"] == "mean_amp_mean"].copy()
     rssi_rows = ordering_stability.loc[ordering_stability["metric"] == "rssi_mean"].copy()
     ref_name = _scenario_display_name(reference_scenario)
+    stability_runs = int(mean_amp_rows["run_id"].nunique())
     lines = [
         "# Obstacle Scenario Analysis Report",
         "",
@@ -882,6 +899,11 @@ def write_report(
         f"- Estimated distances (m): `{ds['distance_values_m']}`",
         "",
         "## Main Findings",
+        (
+            "- The primary dataset is the equal-distance four-scenario subset "
+            "(`s01_empty_space`, `s05_door`, `s03_one_wall`, `s04_two_walls`); "
+            "the mixed-distance chair scenario is excluded from primary outputs."
+        ),
         f"- `{ref_name}` is the reference scenario for all reported deltas.",
         "- Median packet-level RSSI orders the scenarios from lightest to strongest attenuation as: "
         + ", ".join(scenario_summary.sort_values("rssi_packet_median", ascending=False)["scenario_display"].astype(str).tolist())
@@ -890,14 +912,13 @@ def write_report(
         + ", ".join(scenario_summary.sort_values("mean_amp_packet_median", ascending=False)["scenario_display"].astype(str).tolist())
         + ".",
         (
-            "- Run-level `mean_amp_mean` ordering was perfectly stable across the three runs "
+            f"- Run-level `mean_amp_mean` ordering was stable across the {stability_runs} repeated runs "
             f"(Kendall tau vs run 1: {', '.join(f'run {int(row.run_id)}={row.kendall_tau_vs_run_1:.2f}' for _, row in mean_amp_rows.iterrows())})."
         ),
         (
-            "- Run-level `rssi_mean` ordering was stable up to one swap between the reference and chair scenarios "
+            "- Run-level `rssi_mean` ordering stayed highly stable across repeats "
             f"(Kendall tau vs run 1: {', '.join(f'run {int(row.run_id)}={row.kendall_tau_vs_run_1:.2f}' for _, row in rssi_rows.iterrows())})."
         ),
-        "- Important caveat: the chair scenario was captured at 3.0 m, while the other scenarios were nominally 2.0 m, so its delta is not a pure obstacle-only effect.",
         "",
         "## Scenario Summary",
         scenario_summary.to_string(index=False, float_format=lambda value: f"{value:.4f}" if isinstance(value, float) else str(value)),
@@ -910,7 +931,6 @@ def write_report(
     ]
     if not ml_overall.empty:
         core_row = ml_overall.loc[ml_overall["task_id"] == "core_equal_distance"].iloc[0]
-        mixed_row = ml_overall.loc[ml_overall["task_id"] == "mixed_five_scenario"].iloc[0]
         lines.extend(
             [
                 "",
@@ -919,10 +939,6 @@ def write_report(
                 (
                     f"- Equal-distance core subset ({int(core_row['num_classes'])} classes, window size {int(core_row['window_size'])}) "
                     f"reached accuracy `{core_row['accuracy']:.4f}` and macro-F1 `{core_row['macro_f1']:.4f}`."
-                ),
-                (
-                    f"- Mixed-distance five-scenario set reached accuracy `{mixed_row['accuracy']:.4f}` and macro-F1 "
-                    f"`{mixed_row['macro_f1']:.4f}`, but this result remains confounded by the 3.0 m chair capture."
                 ),
                 (
                     f"- For the equal-distance core subset, every error stayed within one severity step "
@@ -966,6 +982,7 @@ def main() -> None:
         figs_dir.mkdir(parents=True, exist_ok=True)
 
     packet_df, run_df = load_dataset(data_dir)
+    packet_df, run_df = select_primary_equal_distance_subset(packet_df, run_df)
     dataset_summary = build_dataset_summary(packet_df, run_df)
     scenario_summary = build_scenario_summary(packet_df, run_df)
     reference_deltas = build_reference_deltas(packet_df, run_df, args.reference_scenario)
@@ -1051,7 +1068,6 @@ def main() -> None:
                 tables_dir / "table_ml_overall.csv",
                 tables_dir / "table_ml_per_class.csv",
                 tables_dir / "table_ml_predictions_core_equal_distance.csv",
-                tables_dir / "table_ml_predictions_mixed_five_scenario.csv",
             ]
         )
     if MATPLOTLIB_AVAILABLE:
