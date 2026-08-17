@@ -25,14 +25,14 @@ This workflow assumes:
 First-time build+flash:
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_tx_laptop.sh
 ```
 
 Subsequent runs (skip rebuild/reflash):
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_tx_laptop.sh --skip-build --skip-flash
 ```
 
@@ -53,21 +53,21 @@ Expected outcome:
 First-time build+flash `csi_recv`:
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_rx_csi_node.sh --port /dev/esp32_csi
 ```
 
 Subsequent runs (skip rebuild/reflash):
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_rx_csi_node.sh --port /dev/esp32_csi --skip-build --skip-flash
 ```
 
 ### 3.2 Verify serial path and stream readiness
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./tools/exp --list-devices
 ./tools/exp --list-target-profiles
 ./tools/exp capture --experiment static_sign_v1 --dry-run-packets 5 --dry-run-timeout 10s
@@ -86,7 +86,7 @@ On macOS, you can also pass an explicit device if multiple ports exist:
 Recommended interactive protocol (captures baseline then hands_up with prompts):
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_static_sign_protocol.sh \
   --target-profile esp32s3_csi_v1 \
   --dataset-id 20260302_subject01_labA \
@@ -120,7 +120,7 @@ This creates:
 Use helper script:
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_static_sign_train_eval.sh \
   --dataset-id 20260302_subject01_labA \
   --model svm_linear \
@@ -131,7 +131,7 @@ cd ~/Projects/csi_capture
 Or direct CLI commands:
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./tools/exp train \
   --experiment static_sign_v1 \
   --dataset data/experiments/static_sign_v1/20260302_subject01_labA \

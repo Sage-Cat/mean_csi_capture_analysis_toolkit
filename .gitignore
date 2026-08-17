@@ -16,6 +16,9 @@ pip-wheel-metadata/
 # Local experiment runs (directory or symlink)
 /experiments
 
+# Local trained models (pickle artifacts must not be published implicitly)
+/artifacts
+
 # Local analysis output (keep skeleton files tracked)
 /out/*
 !/out/.gitkeep

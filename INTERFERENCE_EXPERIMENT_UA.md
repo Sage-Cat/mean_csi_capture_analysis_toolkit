@@ -244,21 +244,21 @@ py -3 -m csi_capture.interference_protocol `
 ### 8.1 Підняти TX
 
 ```bash
-cd /home/sagecat/Projects/csi_capturing_example
+cd csi_capturing_example
 ./scripts/run_tx_laptop.sh --skip-build --skip-flash
 ```
 
 ### 8.2 Підготувати RX-плату
 
 ```bash
-cd /home/sagecat/Projects/csi_capturing_example
+cd csi_capturing_example
 ./scripts/run_rx_csi_node.sh --skip-build --skip-flash
 ```
 
 ### 8.3 Подивитися матрицю сценаріїв
 
 ```bash
-cd /home/sagecat/Projects/csi_capturing_example
+cd csi_capturing_example
 ./scripts/run_interference_protocol.sh --list-scenarios
 ./scripts/run_interference_protocol.sh --scenario-set full --list-scenarios
 ```
@@ -266,7 +266,7 @@ cd /home/sagecat/Projects/csi_capturing_example
 ### 8.4 Запустити захоплення для `core`
 
 ```bash
-cd /home/sagecat/Projects/csi_capturing_example
+cd csi_capturing_example
 ./scripts/run_interference_protocol.sh \
   --target-profile esp32s3_csi_v1 \
   --exp-id exp_interference_20260308 \
@@ -280,7 +280,7 @@ cd /home/sagecat/Projects/csi_capturing_example
 ### 8.5 Запустити повний набір
 
 ```bash
-cd /home/sagecat/Projects/csi_capturing_example
+cd csi_capturing_example
 ./scripts/run_interference_protocol.sh \
   --target-profile esp32s3_csi_v1 \
   --exp-id exp_interference_full_20260308 \

@@ -76,7 +76,7 @@ brew install git wget python cmake ninja ccache dfu-util libusb pkg-config
 ### 3.4 Встановлення Python-оточення (обидві платформи)
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install --upgrade pip
@@ -117,7 +117,7 @@ git clone https://github.com/espressif/esp-csi.git
 У каталозі проєкту:
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 source .venv/bin/activate
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 ./tools/exp --help
@@ -133,14 +133,14 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 Перший запуск (зі збіркою/прошивкою):
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_tx_laptop.sh
 ```
 
 Повторні запуски (без rebuild/reflash):
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_tx_laptop.sh --skip-build --skip-flash
 ```
 
@@ -155,21 +155,21 @@ cd ~/Projects/csi_capture
 1. Підготувати RX-плату (`csi_recv`):
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_rx_csi_node.sh
 ```
 
 Повторні запуски:
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_rx_csi_node.sh --skip-build --skip-flash
 ```
 
 2. Перевірити, що серійний пристрій доступний і є потік CSI:
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./tools/exp --list-devices
 ./tools/exp --list-target-profiles
 ./tools/exp capture --experiment static_sign_v1 --target-profile esp32s3_csi_v1 --dry-run-packets 5 --dry-run-timeout 10s
@@ -184,7 +184,7 @@ cd ~/Projects/csi_capture
 3. Зібрати датасет (інтерактивно `baseline` → `hands_up`):
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_static_sign_protocol.sh \
   --target-profile esp32s3_csi_v1 \
   --dataset-id 20260302_subject01_labA \
@@ -198,7 +198,7 @@ cd ~/Projects/csi_capture
 4. Навчити та оцінити модель:
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_static_sign_train_eval.sh \
   --dataset-id 20260302_subject01_labA \
   --model svm_linear \

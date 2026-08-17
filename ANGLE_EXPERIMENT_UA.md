@@ -87,7 +87,7 @@ git clone https://github.com/espressif/esp-csi.git
 ### 4.5 Python-залежності проєкту
 
 ```bash
-cd /home/sagecat/Projects/csi_capture
+cd csi_capturing_example
 python3 -m pip install -r requirements.txt
 ```
 
@@ -120,7 +120,7 @@ ls -1 /dev/cu.usbmodem* /dev/tty.usbmodem* 2>/dev/null
 ### Крок A: запусти передавач (Laptop A)
 
 ```bash
-cd /home/sagecat/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_tx_laptop.sh --skip-build --skip-flash
 ```
 
@@ -133,7 +133,7 @@ cd /home/sagecat/Projects/csi_capture
 ### Крок B: запусти збір кутового датасету (Laptop B)
 
 ```bash
-cd /home/sagecat/Projects/csi_capture
+cd csi_capturing_example
 python3 -m csi_capture.experiment angle \
   --exp-id exp_angle_20260302 \
   --target-profile esp32s3_csi_v1 \

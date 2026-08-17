@@ -27,7 +27,7 @@
 На обох ноутбуках:
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 python3 -m pip install -r requirements.txt
 ```
 
@@ -41,7 +41,7 @@ python3 -m pip install -r requirements.txt
 ## 4) Запуск TX (Laptop A)
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_tx_laptop.sh --skip-build --skip-flash
 ```
 
@@ -54,7 +54,7 @@ cd ~/Projects/csi_capture
 ## 5) Варіант A: швидкий запис через `run_rx_laptop.sh`
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 ./scripts/run_rx_laptop.sh \
   --target-profile esp32s3_csi_v1 \
   --port /dev/esp32_csi \
@@ -78,7 +78,7 @@ cd ~/Projects/csi_capture
 3. Запусти:
 
 ```bash
-cd ~/Projects/csi_capture
+cd csi_capturing_example
 python3 -m csi_capture.experiment distance \
   --config docs/configs/distance_capture.sample.json \
   --target-profile esp32s3_csi_v1 \

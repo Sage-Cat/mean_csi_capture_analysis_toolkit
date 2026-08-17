@@ -34,4 +34,4 @@ Alternative config-driven flow:
 
 This keeps source code clean while allowing unlimited local experiments.
 
-Open `/home/sagecat/Projects/research-workspace` in VS Code to use the shared workspace configuration.
+Open the cloned repository directory in your editor.
