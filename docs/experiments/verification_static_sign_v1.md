@@ -34,12 +34,12 @@ Result (excerpt):
 Command:
 
 ```bash
-./tools/exp validate-config --experiment static_sign_v1 --mode capture --config docs/configs/static_sign_v1.capture.sample.json
+./tools/exp validate-config --experiment static_sign_v1 --mode capture --config ../studies/csi_capture_characterization/configs/static_sign_v1.capture.sample.json
 ```
 
 Result:
 
-- `Config validation passed: mode=capture file=docs/configs/static_sign_v1.capture.sample.json`
+- `Config validation passed: mode=capture file=../studies/csi_capture_characterization/configs/static_sign_v1.capture.sample.json`
 - exit code `0`
 
 ## 4) Device Listing Helper
@@ -85,32 +85,32 @@ Interpretation:
 
 Synthetic dataset generated at:
 
-- `data/experiments/static_sign_v1/smoke_20260302`
+- `../../private/experiments/csi_capture_characterization/datasets/static_sign_v1/smoke_20260302`
 
 Train command:
 
 ```bash
-./tools/exp train --experiment static_sign_v1 --dataset data/experiments/static_sign_v1/smoke_20260302 --model svm_linear --window 1s --overlap 0.5 --artifact out/static_sign_v1_smoke/model.pkl
+./tools/exp train --experiment static_sign_v1 --dataset ../../private/experiments/csi_capture_characterization/datasets/static_sign_v1/smoke_20260302 --model svm_linear --window 1s --overlap 0.5 --artifact ../../private/experiments/csi_capture_characterization/analysis/static_sign_v1_smoke/model.pkl
 ```
 
 Train result:
 
 ```text
-Model artifact: out/static_sign_v1_smoke/model.pkl
-Metrics file: out/static_sign_v1_smoke/model.metrics.json
+Model artifact: ../../private/experiments/csi_capture_characterization/analysis/static_sign_v1_smoke/model.pkl
+Metrics file: ../../private/experiments/csi_capture_characterization/analysis/static_sign_v1_smoke/model.metrics.json
 Train split metrics: accuracy=1.0000 precision=1.0000 recall=1.0000 f1=1.0000
 ```
 
 Eval command:
 
 ```bash
-./tools/exp eval --experiment static_sign_v1 --dataset data/experiments/static_sign_v1/smoke_20260302 --model out/static_sign_v1_smoke/model.pkl --report out/static_sign_v1_smoke/eval_report.json
+./tools/exp eval --experiment static_sign_v1 --dataset ../../private/experiments/csi_capture_characterization/datasets/static_sign_v1/smoke_20260302 --model ../../private/experiments/csi_capture_characterization/analysis/static_sign_v1_smoke/model.pkl --report ../../private/experiments/csi_capture_characterization/analysis/static_sign_v1_smoke/eval_report.json
 ```
 
 Eval result:
 
 ```text
-Eval report: out/static_sign_v1_smoke/eval_report.json
+Eval report: ../../private/experiments/csi_capture_characterization/analysis/static_sign_v1_smoke/eval_report.json
 Metrics: accuracy=1.0000 precision=1.0000 recall=1.0000 f1=1.0000
 Confusion matrix (['baseline', 'hands_up']): [[20, 0], [0, 20]]
 ```

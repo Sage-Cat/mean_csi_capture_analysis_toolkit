@@ -24,13 +24,13 @@ BANDWIDTH_MHZ="20"
 PACKET_RATE_HZ="250"
 TX_POWER_DBM="default"
 
-IDF_PATH_DEFAULT="$HOME/esp/esp-idf"
-ESP_CSI_PATH_DEFAULT="$HOME/esp/esp-csi"
+IDF_PATH_DEFAULT="$REPO_ROOT/../../my-inventory/toolchains/esp-idf-v5.5.2"
+ESP_CSI_PATH_DEFAULT="$REPO_ROOT/../../my-inventory/helpers/firmware/esp-csi"
 IDF_PATH="${IDF_PATH:-$IDF_PATH_DEFAULT}"
 ESP_CSI_PATH="${ESP_CSI_PATH:-$ESP_CSI_PATH_DEFAULT}"
 
 OUT_FILE=""
-EXP_ROOT="$REPO_ROOT/experiments"
+EXP_ROOT="$REPO_ROOT/../../private/experiments/csi_capture_characterization/runs"
 
 usage() {
   cat <<'EOF'
@@ -59,7 +59,7 @@ Device/build options:
 Output/options:
   --format <jsonl|csv>     Output format (default: jsonl)
   --out <path>             Output file override
-  --exp-root <path>        Experiment root directory (default: <repo>/experiments)
+  --exp-root <path>        Experiment root (default: private experiment storage)
 
 Meta options (written to meta.json):
   --channel <num>          Wi-Fi channel (default: 11)

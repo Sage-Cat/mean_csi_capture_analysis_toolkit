@@ -16,18 +16,14 @@ pip-wheel-metadata/
 # Local experiment runs (directory or symlink)
 /experiments
 
-# Local analysis output (keep skeleton files tracked)
-/out/*
-!/out/.gitkeep
-!/out/README.md
+# Local analysis output is not a repository data surface.
+/out/
 
 # Legacy output folders
 /out_*/
 
-# Temporary data captures
-/data/experiments/
-/data/tmp/
-/data/*.tmp
+# Data belongs under the registered private experiment root.
+/data/
 
 # Build artifacts
 /build/

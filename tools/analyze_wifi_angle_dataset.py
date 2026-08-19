@@ -17,7 +17,7 @@ ANGLE_COLUMNS = ["angle_deg", "exp_id", "run_id", "trial_id", "scenario", "sourc
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_dir", required=True, help="Input dataset root.")
-    parser.add_argument("--out_dir", default="out/angle_dataset", help="Output directory.")
+    parser.add_argument("--out_dir", default="../../private/experiments/csi_capture_characterization/analysis/angle_dataset", help="Output directory.")
     return parser.parse_args()
 
 

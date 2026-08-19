@@ -38,7 +38,7 @@ Definition of done:
 
 Tasks:
 
-1. Update sample configs (`docs/configs/*`) to include `target_profile`.
+1. Update sample configs (`../studies/csi_capture_characterization/configs/*`) to include `target_profile`.
 2. Update protocol scripts to pass profile id explicitly where appropriate.
 3. Keep defaults aligned with shared profile settings.
 

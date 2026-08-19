@@ -710,6 +710,6 @@ STATIC_SIGN_PLUGIN = ExperimentPlugin(
     validate_handler=validate_static_sign_config,
     examples=(
         "tools/exp capture --experiment static_sign_v1 --label baseline --runs 5 --duration 20s",
-        "tools/exp train --experiment static_sign_v1 --dataset data/experiments/static_sign_v1/20260302 --model svm_linear",
+        "tools/exp train --experiment static_sign_v1 --dataset ../../private/experiments/csi_capture_characterization/datasets/static_sign_v1/20260302 --model svm_linear",
     ),
 )

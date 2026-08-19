@@ -20,7 +20,7 @@ PlantUML source + rendered PNGs:
 ## Operational Playbooks
 
 - Two-laptop static sign workflow:
-  `docs/experiments/static_sign_v1_two_laptop_workflow.md`
+  `../studies/csi_capture_characterization/runbooks/static_sign_v1_two_laptop_workflow.md`
 
 ## Target Environment Profile
 
@@ -39,14 +39,14 @@ List available profiles:
 Distance capture from config:
 
 ```bash
-./tools/exp distance --config docs/configs/distance_capture.sample.json
+./tools/exp distance --config ../studies/csi_capture_characterization/configs/distance_capture.sample.json
 ```
 
 Angle capture from config:
 
 ```bash
 python3 -m csi_capture.experiment angle \
-  --config docs/configs/angle_radial_45deg_2runs.sample.json
+  --config ../studies/csi_capture_characterization/configs/angle_radial_45deg_2runs.sample.json
 ```
 
 static_sign_v1 capture:

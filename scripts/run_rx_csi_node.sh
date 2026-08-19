@@ -8,8 +8,10 @@ BUILD=1
 FLASH=1
 MONITOR=0
 
-IDF_PATH_DEFAULT="$HOME/esp/esp-idf"
-ESP_CSI_PATH_DEFAULT="$HOME/esp/esp-csi"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+IDF_PATH_DEFAULT="$REPO_ROOT/../../my-inventory/toolchains/esp-idf-v5.5.2"
+ESP_CSI_PATH_DEFAULT="$REPO_ROOT/../../my-inventory/helpers/firmware/esp-csi"
 IDF_PATH="${IDF_PATH:-$IDF_PATH_DEFAULT}"
 ESP_CSI_PATH="${ESP_CSI_PATH:-$ESP_CSI_PATH_DEFAULT}"
 

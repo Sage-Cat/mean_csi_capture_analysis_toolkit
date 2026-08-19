@@ -101,7 +101,7 @@ experiments/
 Distance legacy layout from `run_rx_laptop.sh` is preserved:
 
 ```text
-experiments/<exp_id>/<scenario>/run_<run_id>/distance_<X>m.jsonl
+../../private/experiments/csi_capture_characterization/runs/<exp_id>/<scenario>/run_<run_id>/distance_<X>m.jsonl
 ```
 
 ## Reproducibility and Metadata

@@ -19,8 +19,8 @@ rectangle "Laptop B (RX)" as LaptopRX {
 
 node "ESP32 TX Board\n(target_profile=esp32s3_csi_v1)" as TXBoard
 node "ESP32 RX Board\n(target_profile=esp32s3_csi_v1)" as RXBoard
-database "Dataset Storage\n(experiments/ + data/experiments/)" as DatasetStore
-folder "Reports and Analytics\n(out/ + artifacts/)" as Reports
+database "Private Study Storage\n(private/experiments/csi_capture_characterization/)" as DatasetStore
+folder "Private Analysis and Artifacts" as Reports
 
 Operator --> LaptopTX : flash/start TX firmware
 Operator --> LaptopRX : run capture/train/eval commands

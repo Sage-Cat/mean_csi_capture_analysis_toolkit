@@ -1,6 +1,0 @@
-{
-  "experiment": "presence_v1",
-  "scenario": "labA_los",
-  "packets_per_trial": 500,
-  "notes": "Example future-ready config for occupied vs empty captures."
-}

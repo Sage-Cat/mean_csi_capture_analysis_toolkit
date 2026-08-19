@@ -69,6 +69,6 @@ DISTANCE_PLUGIN = ExperimentPlugin(
     capture_handler=handle_capture,
     validate_handler=validate_distance_config,
     examples=(
-        "tools/exp capture --experiment distance --config docs/configs/distance_capture.sample.json",
+        "tools/exp capture --experiment distance --config ../studies/csi_capture_characterization/configs/distance_capture.sample.json",
     ),
 )

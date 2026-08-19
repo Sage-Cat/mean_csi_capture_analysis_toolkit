@@ -1,6 +1,0 @@
-{
-  "experiment": "static_sign_v1",
-  "dataset": "data/experiments/static_sign_v1/20260302",
-  "model_artifact": "artifacts/static_sign_v1/20260302/svm_linear.pkl",
-  "report": "out/static_sign_v1/report.json"
-}

@@ -19,8 +19,8 @@ Date: 2026-03-08
   - `manifest.json` for distance/angle.
   - `metadata.json` + `frames.jsonl` for static sign.
 - Storage is inconsistent:
-  - `experiments/<exp_id>/<experiment_type>/run_<id>/trial_<id>/capture.jsonl`
-  - `data/experiments/static_sign_v1/<dataset>/<label>/run_<id>/frames.jsonl`
+  - `../../private/experiments/csi_capture_characterization/runs/<exp_id>/<experiment_type>/run_<id>/trial_<id>/capture.jsonl`
+  - `../../private/experiments/csi_capture_characterization/datasets/static_sign_v1/<dataset>/<label>/run_<id>/frames.jsonl`
 - `tools/analyze_wifi_{distance,angular_localization,stability_statistics}.py` duplicated scenario normalization, file discovery, packet decoding, and path inference logic.
 - CLI discovery was hardcoded around one experiment family, making future plugin-style extension expensive.
 

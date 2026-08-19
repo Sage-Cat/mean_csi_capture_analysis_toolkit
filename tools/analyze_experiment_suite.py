@@ -567,7 +567,7 @@ def write_suite_outputs(
         "",
         "## Scope",
         f"- Repository root: `{ROOT_DIR}`",
-        "- Mounted data root was resolved through the local `experiments/` path.",
+        "- Data was read from the explicitly supplied private experiment root.",
         "- This suite runs the full analysis pass for distance, stability, angle, static gesture, and obstacle datasets.",
         "",
         "## Analysis Summary",

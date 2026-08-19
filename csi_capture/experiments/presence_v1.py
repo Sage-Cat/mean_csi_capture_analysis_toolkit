@@ -54,6 +54,6 @@ PRESENCE_PLUGIN = ExperimentPlugin(
     ),
     validate_handler=validate_presence_config,
     examples=(
-        "tools/exp validate-config --experiment presence_v1 --mode capture --config docs/configs/presence_v1.capture.sample.json",
+        "tools/exp validate-config --experiment presence_v1 --mode capture --config ../studies/csi_capture_characterization/configs/presence_v1.capture.sample.json",
     ),
 )

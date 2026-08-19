@@ -97,7 +97,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--out_dir",
-        default="out/distance_measurement",
+        default="../../private/experiments/csi_capture_characterization/analysis/distance_measurement",
         help="Output directory for plots, tables, and report.",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")

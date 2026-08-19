@@ -200,7 +200,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Duration per run (e.g. 20s, 1m). Ignored when --packets-per-run is used.",
     )
     capture.add_argument("--packets-per-run", type=int, default=None, help="Capture N packets per run")
-    capture.add_argument("--dataset-root", default="data/experiments", help="Dataset root directory")
+    capture.add_argument(
+        "--dataset-root",
+        default="../../private/experiments/csi_capture_characterization/datasets",
+        help="Dataset root directory",
+    )
     capture.add_argument("--dataset-id", default=None, help="Dataset id (default: UTC date YYYYMMDD)")
     capture.add_argument("--device", default=None, help="Serial device path override")
     capture.add_argument(

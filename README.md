@@ -14,14 +14,14 @@ csi_capture/              # Python capture/parser/experiment modules
 scripts/                  # Operational scripts (TX/RX, local setup)
 tools/                    # Analysis scripts
 tests/                    # Unit tests
-docs/                     # Notes + config templates + architecture docs
+docs/                     # Reusable platform and architecture docs
 docs/design/plantuml/     # PlantUML design source + rendered PNG diagrams
-experiments/              # Local raw runs (git-ignored, often a local symlink)
-out/                      # Local generated figures/tables/reports (git-ignored except README/.gitkeep)
-data/                     # Small reusable sample data only
 ```
 
-`experiments/`, `out/`, and build files are intentionally ignored so students can run scripts locally without polluting git history.
+Concrete plans and privacy-safe sample profiles live in the registered study at
+`../studies/csi_capture_characterization/`. Raw runs, datasets, generated
+analysis, and artifacts live only under
+`../../private/experiments/csi_capture_characterization/`.
 
 Full local analysis pass across the mounted experiment datasets:
 
@@ -29,7 +29,9 @@ Full local analysis pass across the mounted experiment datasets:
 make analyze-suite
 ```
 
-This runs the full distance, stability, angle, static-gesture, and obstacle analyzers, then writes a consolidated suite summary under `out/experiment_analysis_suite/`.
+This runs the full distance, stability, angle, static-gesture, and obstacle
+analyzers, then writes a consolidated suite summary under the private study's
+`analysis/` directory.
 
 ## 1) System Dependencies (Both Laptops)
 
@@ -135,14 +137,14 @@ On macOS, pass explicit ports when needed, for example:
 ./scripts/run_rx_laptop.sh --port /dev/cu.usbmodem1101 --exp-id exp_macos_test --scenario LoS --run-id 1 --distance-m 1.0 --max-records 200
 ```
 
-By default, RX output is stored under `experiments/<exp_id>/...`.
+By default, RX output is stored under `../../private/experiments/csi_capture_characterization/runs/<exp_id>/...`.
 
 New unified config-driven runner (distance + angle):
 
 ```bash
 # Distance experiment from config
 python3 -m csi_capture.experiment distance \
-  --config docs/configs/distance_capture.sample.json \
+  --config ../studies/csi_capture_characterization/configs/distance_capture.sample.json \
   --target-profile esp32s3_csi_v1
 
 # Angle/AoA dataset capture directly from CLI (no JSON editing)
@@ -193,7 +195,7 @@ are still supported for backward compatibility:
 
 ```bash
 python3 -m csi_capture.experiment angle \
-  --config docs/configs/angle_radial_45deg_2runs.sample.json \
+  --config ../studies/csi_capture_characterization/configs/angle_radial_45deg_2runs.sample.json \
   --device auto
 ```
 
@@ -217,20 +219,20 @@ New experiment framework CLI (includes `static_sign_v1`):
 ./tools/exp capture --experiment static_sign_v1 --target-profile esp32s3_csi_v1 --label baseline --runs 5 --duration 20s
 
 # Protocol helper (baseline then hands_up with prompts)
-./scripts/run_static_sign_protocol.sh \
+../studies/csi_capture_characterization/legacy/scripts/run_static_sign_protocol.sh \
   --device /dev/esp32_csi \
   --target-profile esp32s3_csi_v1 \
-  --dataset-id 20260302_subject01_labA \
+  --dataset-id replace_with_private_dataset_code \
   --runs 5 \
   --duration 20s \
-  --subject-id subject01 \
-  --environment-id labA
+  --subject-id replace_with_private_participant_code \
+  --environment-id replace_with_private_site_code
 
 # Validate future-ready config shape for a new experiment family
 ./tools/exp validate-config \
   --experiment presence_v1 \
   --mode capture \
-  --config docs/configs/presence_v1.capture.sample.json
+  --config ../studies/csi_capture_characterization/configs/presence_v1.capture.sample.json
 
 # Interference protocol (cross-platform Python entrypoint)
 python3 -m csi_capture.interference_protocol --list-scenarios
@@ -239,7 +241,7 @@ python3 -m csi_capture.interference_protocol --device auto --scenario-set core -
 
 Native Windows workflow for `interference_v1`:
 
-- `docs/experiments/interference_v1_windows_workflow.md`
+- `../studies/csi_capture_characterization/runbooks/interference_v1_windows_workflow.md`
 
 Device selection precedence for `tools/exp capture`:
 
@@ -249,7 +251,7 @@ Device selection precedence for `tools/exp capture`:
 
 For complete AP+RX two-laptop setup instructions, see:
 
-- `docs/experiments/static_sign_v1_two_laptop_workflow.md`
+- `../studies/csi_capture_characterization/runbooks/static_sign_v1_two_laptop_workflow.md`
 
 ## 5) Experiment Data Structure
 
@@ -272,11 +274,11 @@ Example:
 Layout:
 
 - Legacy distance script layout (unchanged):
-  - `experiments/<exp_id>/meta.json`
-  - `experiments/<exp_id>/<scenario>/run_<run_id>/distance_<X>m.jsonl`
+  - `../../private/experiments/csi_capture_characterization/runs/<exp_id>/meta.json`
+  - `../../private/experiments/csi_capture_characterization/runs/<exp_id>/<scenario>/run_<run_id>/distance_<X>m.jsonl`
 - Unified runner layout:
-  - `experiments/<exp_id>/<experiment_type>/run_<run_id>/manifest.json`
-  - `experiments/<exp_id>/<experiment_type>/run_<run_id>/trial_<trial_id>/capture.jsonl`
+  - `../../private/experiments/csi_capture_characterization/runs/<exp_id>/<experiment_type>/run_<run_id>/manifest.json`
+  - `../../private/experiments/csi_capture_characterization/runs/<exp_id>/<experiment_type>/run_<run_id>/trial_<trial_id>/capture.jsonl`
 
 Every unified runner invocation writes a per-run `manifest.json` with config snapshot, git revision, device path, and trial summaries.
 
@@ -286,24 +288,24 @@ Distance measurement:
 
 ```bash
 python3 tools/analyze_wifi_distance_measurement.py \
-  --data_dir experiments/<exp_id> \
-  --out_dir out/distance_measurement
+  --data_dir ../../private/experiments/csi_capture_characterization/runs/<exp_id> \
+  --out_dir ../../private/experiments/csi_capture_characterization/analysis/distance_measurement
 ```
 
 Stability statistics:
 
 ```bash
 python3 tools/analyze_wifi_stability_statistics.py \
-  --data_dir experiments/<exp_id> \
-  --out_dir out/stability_statistics
+  --data_dir ../../private/experiments/csi_capture_characterization/runs/<exp_id> \
+  --out_dir ../../private/experiments/csi_capture_characterization/analysis/stability_statistics
 ```
 
 Angle dataset summary:
 
 ```bash
 python3 tools/analyze_wifi_angle_dataset.py \
-  --data_dir experiments/<exp_id>/angle \
-  --out_dir out/angle_dataset
+  --data_dir ../../private/experiments/csi_capture_characterization/runs/<exp_id>/angle \
+  --out_dir ../../private/experiments/csi_capture_characterization/analysis/angle_dataset
 ```
 
 2.4 GHz radio-state survey before/while experiments:
@@ -316,23 +318,25 @@ python3 tools/survey_wifi_24ghz.py \
   --experiment-ssid <your_experiment_ssid>
 ```
 
-Outputs are written to `out/` and are git-ignored.
+Survey output is written only to the explicit output path selected for the
+private study; repository-local generated output is not a canonical data
+surface.
 
 Static sign train/eval:
 
 ```bash
 ./tools/exp train \
   --experiment static_sign_v1 \
-  --dataset data/experiments/static_sign_v1/<dataset_id> \
+  --dataset ../../private/experiments/csi_capture_characterization/datasets/static_sign_v1/<dataset_id> \
   --model svm_linear \
   --window 1s \
   --overlap 0.5
 
 ./tools/exp eval \
   --experiment static_sign_v1 \
-  --dataset data/experiments/static_sign_v1/<dataset_id> \
+  --dataset ../../private/experiments/csi_capture_characterization/datasets/static_sign_v1/<dataset_id> \
   --model artifacts/static_sign_v1/<stamp>/svm_linear.pkl \
-  --report out/static_sign_v1/report.json
+  --report ../../private/experiments/csi_capture_characterization/analysis/static_sign_v1/report.json
 ```
 
 ## 7) Make Targets
@@ -342,13 +346,13 @@ make setup-vscode
 make test
 make tx-node PORT=/dev/ttyACM0
 make rx-smoke PORT=/dev/ttyACM1 EXP_ID=exp_smoke
-make experiment-distance DISTANCE_CONFIG=docs/configs/distance_capture.sample.json
-make experiment-angle ANGLE_CONFIG=docs/configs/angle_radial_45deg_2runs.sample.json
-make analyze-distance DATA_DIR=experiments/<exp_id>
+make experiment-distance DISTANCE_CONFIG=../studies/csi_capture_characterization/configs/distance_capture.sample.json
+make experiment-angle ANGLE_CONFIG=../studies/csi_capture_characterization/configs/angle_radial_45deg_2runs.sample.json
+make analyze-distance DATA_DIR=../../private/experiments/csi_capture_characterization/runs/<exp_id>
 make survey-24ghz
-make analyze-stability DATA_DIR=experiments/<exp_id>
-make analyze-angle DATA_DIR=experiments/<exp_id>/angle
-make analyze-all DATA_DIR=experiments/<exp_id>
+make analyze-stability DATA_DIR=../../private/experiments/csi_capture_characterization/runs/<exp_id>
+make analyze-angle DATA_DIR=../../private/experiments/csi_capture_characterization/runs/<exp_id>/angle
+make analyze-all DATA_DIR=../../private/experiments/csi_capture_characterization/runs/<exp_id>
 ```
 
 ## 8) Documentation Index
@@ -358,7 +362,7 @@ make analyze-all DATA_DIR=experiments/<exp_id>
 - Design package (PlantUML + PNG): `docs/design/plantuml/README.md`
 - Validation report: `docs/experiments/validation_report.md`
 - UA playbooks:
-  - `DISTANCE_EXPERIMENT_UA.md`
-  - `ANGLE_EXPERIMENT_UA.md`
-  - `EXPERIMENT_STATIC_SIGN_UA.md`
-  - `EXPERIMENTS_PLAN_UA.md`
+  - `../studies/csi_capture_characterization/protocols/DISTANCE_EXPERIMENT_UA.md`
+  - `../studies/csi_capture_characterization/protocols/ANGLE_EXPERIMENT_UA.md`
+  - `../studies/csi_capture_characterization/protocols/EXPERIMENT_STATIC_SIGN_UA.md`
+  - `../studies/csi_capture_characterization/protocols/EXPERIMENTS_PLAN_UA.md`

@@ -80,6 +80,6 @@ ANGLE_PLUGIN = ExperimentPlugin(
     capture_handler=handle_capture,
     validate_handler=validate_angle_config,
     examples=(
-        "tools/exp capture --experiment angle --config docs/configs/angle_radial_45deg_2runs.sample.json",
+        "tools/exp capture --experiment angle --config ../studies/csi_capture_characterization/configs/angle_radial_45deg_2runs.sample.json",
     ),
 )

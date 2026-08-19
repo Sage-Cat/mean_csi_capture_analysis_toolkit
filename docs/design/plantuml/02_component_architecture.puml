@@ -36,10 +36,9 @@ package "Capture/Parse" {
 }
 
 database "Storage" {
-  [experiments/<exp_id>/...]
-  [data/experiments/static_sign_v1/...]
-  [artifacts/...]
-  [out/...]
+  [private experiment runs]
+  [private experiment datasets]
+  [private analysis and artifacts]
 }
 
 [tools/exp] --> [csi_capture.cli]

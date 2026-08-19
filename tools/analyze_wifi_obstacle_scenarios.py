@@ -62,7 +62,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data_dir", required=True, help="Obstacle experiment root containing meta.json and scenario runs.")
     parser.add_argument(
         "--out_dir",
-        default="out/obstacle_scenarios",
+        default="../../private/experiments/csi_capture_characterization/analysis/obstacle_scenarios",
         help="Output directory for tables, plots, and report.",
     )
     parser.add_argument(
