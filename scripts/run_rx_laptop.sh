@@ -159,19 +159,28 @@ META_FILE="$EXP_ROOT/$EXP_ID/meta.json"
 MANIFEST_FILE="$BASE_DIR/manifest.json"
 mkdir -p "$(dirname "$META_FILE")"
 if [[ ! -f "$META_FILE" ]]; then
-  cat > "$META_FILE" <<EOF
-{
-  "exp_id": "$EXP_ID",
-  "created_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "target_profile": "$TARGET_PROFILE",
-  "channel": $CHANNEL,
-  "bandwidth_mhz": $BANDWIDTH_MHZ,
-  "packet_rate_hz": $PACKET_RATE_HZ,
-  "tx_power_dbm": "$TX_POWER_DBM",
-  "target": "$TARGET",
-  "notes": "ESP32-S3 CSI experiment (2.4 GHz only)"
+  python3 - \
+    "$META_FILE" "$EXP_ID" "$TARGET_PROFILE" "$CHANNEL" \
+    "$BANDWIDTH_MHZ" "$PACKET_RATE_HZ" "$TX_POWER_DBM" "$TARGET" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+meta_file, exp_id, target_profile, channel, bandwidth, rate, power, target = sys.argv[1:]
+payload = {
+    "exp_id": exp_id,
+    "created_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+    "target_profile": target_profile,
+    "channel": int(channel),
+    "bandwidth_mhz": int(bandwidth),
+    "packet_rate_hz": int(rate),
+    "tx_power_dbm": power,
+    "target": target,
+    "notes": "ESP32-S3 CSI experiment (2.4 GHz only)",
 }
-EOF
+Path(meta_file).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
 fi
 
 # shellcheck source=/dev/null
@@ -220,38 +229,49 @@ else
   GIT_DIRTY=0
 fi
 
-python3 - <<PY
+python3 - \
+  "$MANIFEST_FILE" "$EXP_ID" "$TARGET_PROFILE" "$RUN_ID" \
+  "distance_${DISTANCE_TAG}m" "$PORT" "$GIT_COMMIT" "$GIT_DIRTY" \
+  "$OUT_FILE" "$RECORDS_CAPTURED" "$FORMAT" "$MAX_RECORDS" \
+  "$SCENARIO" "$DISTANCE_M" "$CHANNEL" "$BANDWIDTH_MHZ" \
+  "$PACKET_RATE_HZ" "$TX_POWER_DBM" "$TARGET" <<'PY'
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+(
+    manifest_file, exp_id, target_profile, run_id, trial_id, port,
+    git_commit, git_dirty, output_file, records_captured, output_format,
+    max_records, scenario, distance_m, channel, bandwidth, rate, power, target,
+) = sys.argv[1:]
 manifest = {
-    "exp_id": "$EXP_ID",
+    "exp_id": exp_id,
     "experiment_type": "distance",
-    "target_profile": "$TARGET_PROFILE",
-    "run_id": "$RUN_ID",
-    "trial_id": "distance_${DISTANCE_TAG}m",
+    "target_profile": target_profile,
+    "run_id": run_id,
+    "trial_id": trial_id,
     "created_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-    "device_path": "$PORT",
-    "git_commit": "$GIT_COMMIT",
-    "git_dirty": bool(int("$GIT_DIRTY")),
-    "output_file": "$OUT_FILE",
-    "records_captured": int("$RECORDS_CAPTURED"),
+    "device_path": port,
+    "git_commit": git_commit,
+    "git_dirty": bool(int(git_dirty)),
+    "output_file": output_file,
+    "records_captured": int(records_captured),
     "config_snapshot": {
-        "format": "$FORMAT",
-        "max_records": int("$MAX_RECORDS"),
-        "scenario": "$SCENARIO",
-        "distance_m": float("$DISTANCE_M"),
-        "channel": int("$CHANNEL"),
-        "bandwidth_mhz": int("$BANDWIDTH_MHZ"),
-        "packet_rate_hz": int("$PACKET_RATE_HZ"),
-        "tx_power_dbm": "$TX_POWER_DBM",
-        "target": "$TARGET",
-        "target_profile": "$TARGET_PROFILE",
+        "format": output_format,
+        "max_records": int(max_records),
+        "scenario": scenario,
+        "distance_m": float(distance_m),
+        "channel": int(channel),
+        "bandwidth_mhz": int(bandwidth),
+        "packet_rate_hz": int(rate),
+        "tx_power_dbm": power,
+        "target": target,
+        "target_profile": target_profile,
     },
 }
 
-Path("$MANIFEST_FILE").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+Path(manifest_file).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 
 echo "RX capture complete: $RECORDS_CAPTURED records"

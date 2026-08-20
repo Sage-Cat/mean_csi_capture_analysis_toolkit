@@ -1,7 +1,7 @@
 # Verification Report: static_sign_v1
 
 Date: 2026-03-02
-Repo: `/home/sagecat/Projects/csi_capture`
+Repository: `csi_capturing_example`
 
 ## 1) Unit Tests
 
