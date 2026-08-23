@@ -38,13 +38,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--data_root",
-        default="experiments",
-        help="Root containing the mounted experiment directories.",
+        required=True,
+        help="Session-owned root containing experiment directories.",
     )
     parser.add_argument(
         "--out_dir",
-        default="out",
-        help="Root directory for generated analysis artifacts.",
+        required=True,
+        help="Session-owned root directory for generated analysis artifacts.",
     )
     parser.add_argument("--seed", type=int, default=42, help="Shared random seed for analyzers.")
     parser.add_argument(

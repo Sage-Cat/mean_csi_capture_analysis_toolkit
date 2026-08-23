@@ -14,6 +14,7 @@ from csi_capture.experiment import (
 
 class ExperimentConfigTests(unittest.TestCase):
     def _load(self, payload: dict):
+        payload.setdefault("output_root", "/tmp/session-owned-output")
         with tempfile.TemporaryDirectory() as tmp_dir:
             path = Path(tmp_dir) / "config.json"
             path.write_text(json.dumps(payload), encoding="utf-8")

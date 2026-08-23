@@ -1,0 +1,18 @@
+schema_version = 1
+mean_id = "csi_capture_analysis_toolkit"
+canonical_name = "CSI Capture Analysis Toolkit"
+implementation_surface = "."
+method_links = [
+  { canonical_id = "single_link_wifi_sensing_baseline_construction", role = "supports_method" },
+]
+
+[practical_contract]
+implementation_kind = "software"
+practical_task = "Capture, parse, and analyze ESP32 CSI data with session-selected destinations."
+usable_result = "Structured capture records and offline analysis artifacts at an explicit session-owned path."
+intended_user = "Authorized CSI experiment operator."
+application_route = "Pass an explicit session-owned output path to every capture or analysis command."
+inputs = ["Serial CSI data or an existing capture dataset"]
+outputs = ["Capture records, manifests, and analysis reports at the supplied path"]
+exclusions = ["Experiment plans, raw-session ownership, location observations, and scientific claims"]
+verification_routes = ["python3 -m unittest discover -s tests -p 'test_*.py' -v"]

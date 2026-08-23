@@ -202,8 +202,8 @@ def build_parser() -> argparse.ArgumentParser:
     capture.add_argument("--packets-per-run", type=int, default=None, help="Capture N packets per run")
     capture.add_argument(
         "--dataset-root",
-        default="../../private/experiments/csi_capture_characterization/datasets",
-        help="Dataset root directory",
+        required=True,
+        help="Session-owned dataset root directory",
     )
     capture.add_argument("--dataset-id", default=None, help="Dataset id (default: UTC date YYYYMMDD)")
     capture.add_argument("--device", default=None, help="Serial device path override")
@@ -302,8 +302,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     capture.add_argument(
         "--output-root",
-        default="experiments",
-        help="Output root for config-driven or angle CLI capture.",
+        required=True,
+        help="Session-owned output root for config-driven or angle CLI capture.",
     )
 
     train = sub.add_parser("train", help="Train model for an experiment dataset.")
@@ -319,7 +319,7 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--overlap", type=float, default=0.5, help="Window overlap [0,1)")
     train.add_argument("--test-size", type=float, default=0.3, help="Group split test fraction")
     train.add_argument("--seed", type=int, default=42, help="Random seed")
-    train.add_argument("--artifact", default=None, help="Output model artifact path")
+    train.add_argument("--artifact", required=True, help="Session-owned output model artifact path")
 
     eval_parser = sub.add_parser("eval", help="Evaluate a trained model.")
     eval_parser.add_argument(

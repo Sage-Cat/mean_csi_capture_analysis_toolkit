@@ -94,8 +94,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--out_dir",
-        default="../../private/experiments/csi_capture_characterization/analysis/angular_localization",
-        help="Output directory for plots, tables, and report.",
+        required=True,
+        help="Session-owned output directory for plots, tables, and report.",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     parser.add_argument(

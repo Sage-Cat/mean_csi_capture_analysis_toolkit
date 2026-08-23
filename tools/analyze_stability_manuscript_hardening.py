@@ -21,8 +21,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data_dir", required=True, help="Experiment root with JSONL files.")
     parser.add_argument(
         "--out_dir",
-        default="../../private/experiments/csi_capture_characterization/analysis/stability_statistics_hardening",
-        help="Output directory for generated artifacts.",
+        required=True,
+        help="Session-owned output directory for generated artifacts.",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     parser.add_argument(

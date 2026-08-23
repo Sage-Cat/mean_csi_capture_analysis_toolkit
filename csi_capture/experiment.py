@@ -259,7 +259,7 @@ def build_angle_cli_config(args: argparse.Namespace) -> dict[str, Any]:
         "exp_id": exp_id,
         "run_id": run_ids[0],
         "run_ids": run_ids,
-        "output_root": str(args.output_root or "experiments").strip() or "experiments",
+        "output_root": str(args.output_root).strip(),
         "scenario_tags": _split_cli_values(args.scenario_tags),
         "environment": {
             "room_id": str(args.room_id or "").strip(),
@@ -386,8 +386,10 @@ def _normalize_config(raw: dict[str, Any]) -> ExperimentConfig:
         raise ExperimentConfigError("run_id cannot be empty.")
     run_ids = _normalize_run_ids(run_id=run_id, run_ids_raw=raw.get("run_ids"))
 
-    output_root_raw = str(raw.get("output_root", "experiments")).strip()
-    output_root = Path(output_root_raw) if output_root_raw else Path("experiments")
+    output_root_raw = str(raw.get("output_root", "")).strip()
+    if not output_root_raw:
+        raise ExperimentConfigError("output_root must be an explicit session-owned path")
+    output_root = Path(output_root_raw)
 
     scenario_tags = _normalize_string_list(raw.get("scenario_tags"), "scenario_tags")
     environment_raw = raw.get("environment", {})
@@ -1085,8 +1087,8 @@ def _parser() -> argparse.ArgumentParser:
     )
     angle_parser.add_argument(
         "--output-root",
-        default="experiments",
-        help="Output root directory in CLI mode (default: experiments).",
+        required=True,
+        help="Session-owned output root directory in CLI mode.",
     )
     angle_parser.add_argument(
         "--baud",
