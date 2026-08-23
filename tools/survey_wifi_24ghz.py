@@ -43,7 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--experiment-ssid", default=None, help="SSID of your experiment AP to exclude from interference ranking.")
     parser.add_argument("--experiment-bssid", default=None, help="BSSID of your experiment AP to exclude from interference ranking.")
     parser.add_argument("--top-n", type=int, default=10, help="Number of top interferers to keep in the report.")
-    parser.add_argument("--out-dir", default="../../private/experiments/csi_capture_characterization/analysis/radio_state_24ghz", help="Output root directory.")
+    parser.add_argument("--out-dir", required=True, help="Session-owned output root directory.")
     parser.add_argument("--report-id", default=None, help="Report directory id (default: UTC timestamped).")
     parser.add_argument("--no-save-raw", action="store_true", help="Do not persist raw scan outputs.")
     return parser

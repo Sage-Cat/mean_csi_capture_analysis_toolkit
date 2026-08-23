@@ -69,8 +69,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data_dir", required=True, help="Dataset root containing baseline/hands_up runs.")
     parser.add_argument(
         "--out_dir",
-        default="../../private/experiments/csi_capture_characterization/analysis/static_gesture",
-        help="Output directory for figures, tables, and report.",
+        required=True,
+        help="Session-owned output directory for figures, tables, and report.",
     )
     parser.add_argument(
         "--window_s",

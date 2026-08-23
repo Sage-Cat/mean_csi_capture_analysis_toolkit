@@ -363,7 +363,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_ENVIRONMENT_PROFILE_ID,
         help=f"Target environment profile id (default: {DEFAULT_ENVIRONMENT_PROFILE_ID})",
     )
-    parser.add_argument("--exp-root", default="experiments", help="Output root (default: experiments)")
+    parser.add_argument("--exp-root", default=None, help="Session-owned output root")
     parser.add_argument("--exp-id", default=None, help="Experiment id (default: exp_interference_<UTC timestamp>)")
     parser.add_argument("--scenario-set", choices=sorted(SCENARIO_SETS), default="core")
     parser.add_argument("--runs", type=int, default=3, help="Runs per scenario (default: 3)")
@@ -400,6 +400,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.list_scenarios:
         _print_scenarios(args.scenario_set)
         return 0
+    if not args.exp_root:
+        parser.error("--exp-root is required when writing a capture")
 
     repo_root = _repo_root()
     exp_root = Path(args.exp_root)

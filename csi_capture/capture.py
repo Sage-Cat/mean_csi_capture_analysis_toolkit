@@ -136,8 +136,8 @@ def main() -> int:
     parser.add_argument(
         "-o",
         "--output",
-        default="csi_capture.jsonl",
-        help="Output file path (jsonl or csv)",
+        required=True,
+        help="Session-owned output file path (jsonl or csv)",
     )
     parser.add_argument(
         "--format",

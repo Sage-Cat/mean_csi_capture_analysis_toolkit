@@ -647,7 +647,7 @@ def handle_capture(args: argparse.Namespace) -> int:
 
 
 def handle_train(args: argparse.Namespace) -> int:
-    artifact = Path(args.artifact) if args.artifact else _default_model_artifact_path(args.model)
+    artifact = Path(args.artifact)
     try:
         window_s = parse_duration_s(args.window)
         summary = train_static_sign_model(
@@ -709,7 +709,7 @@ STATIC_SIGN_PLUGIN = ExperimentPlugin(
     eval_handler=handle_eval,
     validate_handler=validate_static_sign_config,
     examples=(
-        "tools/exp capture --experiment static_sign_v1 --label baseline --runs 5 --duration 20s",
-        "tools/exp train --experiment static_sign_v1 --dataset ../../private/experiments/csi_capture_characterization/datasets/static_sign_v1/20260302 --model svm_linear",
+        "tools/exp capture --experiment static_sign_v1 --dataset-root <session-owned-root> --output-root <session-owned-root> --label baseline --runs 5 --duration 20s",
+        "tools/exp train --experiment static_sign_v1 --dataset <session-owned-dataset> --artifact <session-owned-model> --model svm_linear",
     ),
 )

@@ -75,7 +75,7 @@ def parse_args() -> argparse.Namespace:
     """Parse CLI options."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_dir", required=True, help="Input dataset root.")
-    parser.add_argument("--out_dir", default="../../private/experiments/csi_capture_characterization/analysis/stability_statistics", help="Output directory.")
+    parser.add_argument("--out_dir", required=True, help="Session-owned output directory.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     parser.add_argument(
         "--window_sizes",
