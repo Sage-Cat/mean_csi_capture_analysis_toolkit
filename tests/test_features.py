@@ -19,7 +19,7 @@ class FeatureExtractionTests(unittest.TestCase):
         feats = extract_window_features(
             frames,
             run_id="run_001",
-            label="baseline",
+            label="class-a",
             window_ms=1000,
             overlap=0.5,
         )

@@ -10,7 +10,7 @@ class ModelError(RuntimeError):
     """Raised for model creation/load/save issues."""
 
 
-def create_classifier(model_name: str):
+def create_classifier(model_name: str, *, random_state: int | None = None):
     from sklearn.linear_model import LogisticRegression
     from sklearn.pipeline import Pipeline
     from sklearn.preprocessing import StandardScaler
@@ -18,9 +18,9 @@ def create_classifier(model_name: str):
 
     normalized = model_name.strip().lower()
     if normalized in {"svm_linear", "linear_svm", "svm"}:
-        estimator = LinearSVC(random_state=42)
+        estimator = LinearSVC(random_state=random_state)
     elif normalized in {"logreg", "logistic", "logistic_regression"}:
-        estimator = LogisticRegression(max_iter=2000, random_state=42)
+        estimator = LogisticRegression(max_iter=2000, random_state=random_state)
     else:
         raise ModelError(f"Unsupported model '{model_name}'. Use svm_linear or logreg")
 

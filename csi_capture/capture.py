@@ -151,18 +151,10 @@ def main() -> int:
         default=None,
         help="Stop after N parsed CSI records",
     )
-    parser.add_argument("--exp-id", default=None, help="Experiment identifier")
     parser.add_argument(
-        "--experiment-type", default=None, help="Experiment type (e.g. distance, angle)"
-    )
-    parser.add_argument("--scenario", default=None, help="Scenario label (LoS/NLoS_*)")
-    parser.add_argument("--run-id", type=int, default=None, help="Run index, e.g. 1..3")
-    parser.add_argument("--trial-id", default=None, help="Trial identifier")
-    parser.add_argument("--distance-m", type=float, default=None, help="Ground-truth distance in meters")
-    parser.add_argument(
-        "--device-path",
-        default=None,
-        help="Device identifier to store in output metadata (defaults to --port if omitted)",
+        "--metadata-json",
+        default="{}",
+        help="JSON object added to every record; study semantics are supplied by the session.",
     )
     args = parser.parse_args()
 
@@ -180,16 +172,14 @@ def main() -> int:
         f"Writing {args.format} to {output_path}. Press Ctrl+C to stop."
     )
 
-    metadata = {
-        "exp_id": args.exp_id,
-        "experiment_type": args.experiment_type,
-        "scenario": args.scenario,
-        "run_id": args.run_id,
-        "trial_id": args.trial_id,
-        "distance_m": args.distance_m,
-        "device_path": args.device_path,
-    }
-    metadata = {k: v for k, v in metadata.items() if v is not None}
+    try:
+        metadata = json.loads(args.metadata_json)
+    except json.JSONDecodeError as err:
+        print(f"Error: --metadata-json is not valid JSON: {err}")
+        return 2
+    if not isinstance(metadata, dict):
+        print("Error: --metadata-json must decode to an object")
+        return 2
 
     written = 0
     try:

@@ -2,9 +2,6 @@ schema_version = 1
 mean_id = "csi_capture_analysis_toolkit"
 canonical_name = "CSI Capture Analysis Toolkit"
 implementation_surface = "."
-method_links = [
-  { canonical_id = "single_link_wifi_sensing_baseline_construction", role = "supports_method" },
-]
 
 [practical_contract]
 implementation_kind = "software"

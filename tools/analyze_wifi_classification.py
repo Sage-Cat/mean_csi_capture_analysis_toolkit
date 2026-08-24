@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deep static-gesture analysis for the static_sign_v1 ESP32 CSI dataset."""
+"""Parameterized binary classification analysis for labeled ESP32 CSI runs."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import argparse
 import json
 import logging
 import math
-import re
 import sys
 from collections import Counter
 from datetime import datetime
@@ -48,17 +47,11 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from csi_capture.core.dataset import load_static_sign_runs
+from csi_capture.core.dataset import load_labeled_run_dirs
 from csi_capture.core.features import iq_to_amplitude, parse_csi_array
 
-LOGGER = logging.getLogger("wifi_static_gesture_analysis")
-LABELS = ("baseline", "hands_up")
-POS_LABEL = "hands_up"
+LOGGER = logging.getLogger("wifi_classification_analysis")
 EPS = 1e-8
-PARTICIPANT_NAME_ALIASES = {
-    "макс": "Дядюк",
-}
-
 RSSI_FEATURES = ["mean_rssi", "std_rssi", "median_rssi", "range_rssi"]
 CSI_FEATURES = ["mean_amp", "std_amp", "median_amp", "rms_amp", "iqr_amp", "entropy_amp"]
 FUSION_FEATURES = RSSI_FEATURES + CSI_FEATURES
@@ -66,11 +59,54 @@ FUSION_FEATURES = RSSI_FEATURES + CSI_FEATURES
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data_dir", required=True, help="Dataset root containing baseline/hands_up runs.")
+    parser.add_argument("--data_dir", required=True, help="Root containing labeled CSI runs.")
     parser.add_argument(
         "--out_dir",
         required=True,
         help="Session-owned output directory for figures, tables, and report.",
+    )
+    parser.add_argument(
+        "--experiment_id",
+        required=True,
+        help="Current session experiment identifier recorded in the analysis report.",
+    )
+    parser.add_argument(
+        "--run_id",
+        dest="run_ids",
+        action="append",
+        required=True,
+        help="Exact typed session run ID below --data_dir; repeat for every selected run.",
+    )
+    parser.add_argument(
+        "--source_experiment_name",
+        default=None,
+        help="Optional expected historical experiment_name in raw metadata.",
+    )
+    parser.add_argument(
+        "--subject-map",
+        default=None,
+        help=(
+            "Optional JSON file mapping every selected run ID to one private subject-group token; "
+            "keys must exactly match --run_id values."
+        ),
+    )
+    parser.add_argument(
+        "--labels",
+        nargs=2,
+        required=True,
+        metavar=("NEGATIVE", "POSITIVE"),
+        help="Exactly two accepted labels; order controls table and plot display.",
+    )
+    parser.add_argument(
+        "--positive_label",
+        required=True,
+        help="Label used as the positive class; must be one of --labels.",
+    )
+    parser.add_argument(
+        "--schema_version",
+        type=int,
+        default=1,
+        help="Expected labeled-run metadata schema version.",
     )
     parser.add_argument(
         "--window_s",
@@ -92,6 +128,55 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     return parser.parse_args()
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"Duplicate JSON key in subject map: {key}")
+        result[key] = value
+    return result
+
+
+def load_subject_map(
+    path: Path | None,
+    *,
+    selected_run_ids: tuple[str, ...],
+) -> dict[str, str] | None:
+    """Load an exact run-to-private-token map without exposing its values."""
+
+    if path is None:
+        return None
+    try:
+        payload = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_unique_json_object,
+        )
+    except OSError as err:
+        raise ValueError(f"Cannot read --subject-map: {path}: {err}") from err
+    except json.JSONDecodeError as err:
+        raise ValueError(f"Invalid --subject-map JSON: {path}: {err}") from err
+    if not isinstance(payload, dict):
+        raise ValueError("--subject-map must contain one JSON object")
+
+    expected = set(selected_run_ids)
+    supplied = set(payload)
+    missing = sorted(expected - supplied)
+    extra = sorted(supplied - expected)
+    if missing or extra:
+        raise ValueError(
+            "--subject-map keys must exactly match selected run IDs; "
+            f"missing={missing}, extra={extra}"
+        )
+
+    subject_map: dict[str, str] = {}
+    for run_id in selected_run_ids:
+        token = payload[run_id]
+        if not isinstance(token, str) or not token.strip():
+            raise ValueError(f"--subject-map value for '{run_id}' must be a non-empty string")
+        subject_map[run_id] = token
+    return subject_map
 
 
 def _entropy(values: np.ndarray, bins: int = 16) -> float:
@@ -135,39 +220,52 @@ def _parse_iso_utc(text: Any) -> datetime | None:
         return None
 
 
-def _participant_alias_from_metadata(metadata: dict[str, Any]) -> str | None:
-    note = str(metadata.get("notes") or "").strip()
-    if not note:
-        return None
-    alias = note.split("|", 1)[0].strip()
-    return alias or None
+def _subject_group_token(
+    metadata: dict[str, Any],
+    *,
+    subject_map: dict[str, str] | None,
+) -> str | None:
+    """Return an in-memory token from an exact map or explicit raw subject_id."""
+
+    if subject_map is not None:
+        return subject_map[str(metadata["selected_run_id"])]
+    subject = str(metadata.get("subject_id") or "").strip()
+    return subject or None
 
 
-def _participant_name_from_alias(alias: str | None) -> str | None:
-    if not alias:
-        return None
-    normalized = re.sub(r"\s+", " ", alias).strip()
-    normalized = re.sub(r"\s*\d+\s*$", "", normalized).strip()
-    if not normalized:
-        return None
-    return PARTICIPANT_NAME_ALIASES.get(normalized.casefold(), normalized)
+def _opaque_subject_mapping(tokens: set[str]) -> dict[str, str]:
+    return {
+        token: f"subject-{index:03d}"
+        for index, token in enumerate(sorted(tokens), start=1)
+    }
 
 
 def build_window_dataframe(
     data_dir: Path,
     *,
+    run_ids: tuple[str, ...],
+    subject_map: dict[str, str] | None,
+    source_experiment_name: str | None,
+    labels: tuple[str, str],
+    schema_version: int,
     window_s: float,
     overlap: float,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    runs = load_static_sign_runs(data_dir)
+    runs = load_labeled_run_dirs(
+        [data_dir / run_id for run_id in run_ids],
+        experiment_name=source_experiment_name,
+        labels=labels,
+        schema_version=schema_version,
+    )
     window_ms = int(round(window_s * 1000.0))
     window_rows: list[dict[str, Any]] = []
     run_rows: list[dict[str, Any]] = []
 
     for run in runs:
         metadata = run.metadata
-        run_id = str(metadata["run_id"])
-        label = str(metadata["label"]).strip().lower()
+        run_id = str(metadata["selected_run_id"])
+        source_run_id = str(metadata["run_id"])
+        label = str(metadata["label"]).strip()
         valid_frames: list[tuple[int, float, np.ndarray]] = []
 
         for frame in run.frames:
@@ -245,6 +343,7 @@ def build_window_dataframe(
             window_rows.append(
                 {
                     "run_id": run_id,
+                    "source_run_id": source_run_id,
                     "label": label,
                     "window_index": window_index,
                     "window_start_ms": int(start_ms),
@@ -270,6 +369,7 @@ def build_window_dataframe(
         run_rows.append(
             {
                 "run_id": run_id,
+                "source_run_id": source_run_id,
                 "label": label,
                 "raw_frame_count": int(len(run.frames)),
                 "valid_frame_count": int(len(valid_frames)),
@@ -278,9 +378,10 @@ def build_window_dataframe(
                     (timestamps.max() - timestamps.min()) / 1000.0 if timestamps.size > 1 else 0.0
                 ),
                 "capture_duration_s_from_metadata": metadata_duration_s,
-                "subject_id": metadata.get("subject_id"),
-                "participant_alias": _participant_alias_from_metadata(metadata),
-                "participant_name": _participant_name_from_alias(_participant_alias_from_metadata(metadata)),
+                "subject_group_token": _subject_group_token(
+                    metadata,
+                    subject_map=subject_map,
+                ),
                 "environment_id": metadata.get("environment_id"),
                 "target_profile": metadata.get("target_profile"),
             }
@@ -293,6 +394,14 @@ def build_window_dataframe(
         drop=True
     )
     run_df = pd.DataFrame(run_rows).sort_values(["label", "run_id"]).reset_index(drop=True)
+    group_tokens = {
+        str(value) for value in run_df["subject_group_token"].dropna() if str(value)
+    }
+    opaque_subjects = _opaque_subject_mapping(group_tokens)
+    run_df["subject_id"] = (
+        run_df["subject_group_token"].map(opaque_subjects).fillna("subject-unknown")
+    )
+    run_df = run_df.drop(columns=["subject_group_token"])
     return window_df, run_df
 
 
@@ -317,17 +426,14 @@ def summarize_dataset(run_df: pd.DataFrame) -> pd.DataFrame:
 
 def summarize_participants(run_df: pd.DataFrame) -> pd.DataFrame:
     participant_df = run_df.copy()
-    participant_df["participant_name"] = participant_df["participant_name"].fillna("[unknown]")
-    participant_df["participant_alias"] = participant_df["participant_alias"].fillna("[unknown]")
     summary = (
-        participant_df.groupby("participant_name", dropna=False)
+        participant_df.groupby("subject_id", dropna=False)
         .agg(
-            session_count=("participant_alias", "nunique"),
             num_runs=("run_id", "nunique"),
             labels_observed=("label", lambda s: ",".join(sorted(set(str(item) for item in s)))),
         )
         .reset_index()
-        .sort_values(["participant_name"])
+        .sort_values(["subject_id"])
         .reset_index(drop=True)
     )
     return summary
@@ -337,8 +443,8 @@ def participant_lookup(run_df: pd.DataFrame) -> dict[str, str]:
     lookup = {}
     for _, row in run_df.iterrows():
         run_id = str(row["run_id"])
-        participant_name = row.get("participant_name")
-        lookup[run_id] = str(participant_name) if pd.notna(participant_name) and participant_name else "[unknown]"
+        subject_id = row.get("subject_id")
+        lookup[run_id] = str(subject_id) if pd.notna(subject_id) and subject_id else "subject-unknown"
     return lookup
 
 
@@ -368,24 +474,33 @@ def cohens_d(x_a: np.ndarray, x_b: np.ndarray) -> float:
     return float((np.mean(x_a) - np.mean(x_b)) / (math.sqrt(pooled) + EPS))
 
 
-def compute_feature_effect_sizes(window_df: pd.DataFrame) -> pd.DataFrame:
-    baseline = window_df[window_df["label"] == "baseline"]
-    hands_up = window_df[window_df["label"] == "hands_up"]
+def compute_feature_effect_sizes(
+    window_df: pd.DataFrame,
+    *,
+    negative_label: str,
+    positive_label: str,
+) -> pd.DataFrame:
+    negative = window_df[window_df["label"] == negative_label]
+    positive = window_df[window_df["label"] == positive_label]
     rows: list[dict[str, Any]] = []
     for feature in FUSION_FEATURES:
-        base_values = baseline[feature].to_numpy(dtype=float)
-        hands_values = hands_up[feature].to_numpy(dtype=float)
+        negative_values = negative[feature].to_numpy(dtype=float)
+        positive_values = positive[feature].to_numpy(dtype=float)
         rows.append(
             {
                 "feature": feature,
-                "baseline_mean": float(np.nanmean(base_values)),
-                "hands_up_mean": float(np.nanmean(hands_values)),
-                "delta_hands_up_minus_baseline": float(np.nanmean(hands_values) - np.nanmean(base_values)),
-                "cohens_d_hands_up_vs_baseline": cohens_d(hands_values, base_values),
+                "negative_label": negative_label,
+                "positive_label": positive_label,
+                "negative_mean": float(np.nanmean(negative_values)),
+                "positive_mean": float(np.nanmean(positive_values)),
+                "delta_positive_minus_negative": float(
+                    np.nanmean(positive_values) - np.nanmean(negative_values)
+                ),
+                "cohens_d_positive_vs_negative": cohens_d(positive_values, negative_values),
             }
         )
     effect_df = pd.DataFrame(rows)
-    effect_df["abs_cohens_d"] = np.abs(effect_df["cohens_d_hands_up_vs_baseline"])
+    effect_df["abs_cohens_d"] = np.abs(effect_df["cohens_d_positive_vs_negative"])
     effect_df = effect_df.sort_values("abs_cohens_d", ascending=False).reset_index(drop=True)
     return effect_df
 
@@ -393,6 +508,7 @@ def compute_feature_effect_sizes(window_df: pd.DataFrame) -> pd.DataFrame:
 def balanced_group_split(
     window_df: pd.DataFrame,
     *,
+    labels: tuple[str, str],
     test_size: float,
     seed: int,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
@@ -401,7 +517,7 @@ def balanced_group_split(
     test_runs: set[str] = set()
     split_rows: list[dict[str, str]] = []
 
-    for label in LABELS:
+    for label in labels:
         label_runs = sorted(group_df.loc[group_df["label"] == label, "run_id"].astype(str).tolist())
         if len(label_runs) < 2:
             raise ValueError(f"Need at least 2 runs for label '{label}' to create a holdout split.")
@@ -440,19 +556,27 @@ def build_classifier(model_kind: str, seed: int) -> Pipeline:
     )
 
 
-def decision_scores(model: Pipeline, x: np.ndarray) -> np.ndarray | None:
+def decision_scores(
+    model: Pipeline,
+    x: np.ndarray,
+    *,
+    positive_label: str,
+) -> np.ndarray | None:
     if hasattr(model, "decision_function"):
         raw = model.decision_function(x)
         arr = np.asarray(raw, dtype=float)
         if arr.ndim == 1:
-            return arr
+            classes = list(model.named_steps["classifier"].classes_)
+            if len(classes) != 2:
+                raise ValueError("A one-dimensional decision score requires two model classes")
+            return arr if classes[1] == positive_label else -arr
         classes = list(model.named_steps["classifier"].classes_)
-        pos_idx = classes.index(POS_LABEL)
+        pos_idx = classes.index(positive_label)
         return arr[:, pos_idx]
     if hasattr(model, "predict_proba"):
         probs = model.predict_proba(x)
         classes = list(model.named_steps["classifier"].classes_)
-        pos_idx = classes.index(POS_LABEL)
+        pos_idx = classes.index(positive_label)
         return np.asarray(probs[:, pos_idx], dtype=float)
     return None
 
@@ -461,14 +585,16 @@ def classification_metrics(
     y_true: np.ndarray,
     y_pred: np.ndarray,
     *,
+    labels: tuple[str, str],
+    positive_label: str,
     scores: np.ndarray | None,
 ) -> dict[str, float]:
     precision, recall, f1, _ = precision_recall_fscore_support(
         y_true,
         y_pred,
-        labels=list(LABELS),
+        labels=list(labels),
         average="binary",
-        pos_label=POS_LABEL,
+        pos_label=positive_label,
         zero_division=0,
     )
     metrics = {
@@ -480,7 +606,7 @@ def classification_metrics(
         "num_windows": int(y_true.size),
     }
     if scores is not None and len(np.unique(y_true)) == 2:
-        y_binary = (y_true == POS_LABEL).astype(int)
+        y_binary = (y_true == positive_label).astype(int)
         metrics["roc_auc"] = float(roc_auc_score(y_binary, scores))
     else:
         metrics["roc_auc"] = float("nan")
@@ -495,6 +621,8 @@ def majority_label(values: list[str]) -> str:
 def evaluate_models(
     window_df: pd.DataFrame,
     *,
+    labels: tuple[str, str],
+    positive_label: str,
     train_idx: np.ndarray,
     test_idx: np.ndarray,
     seed: int,
@@ -525,10 +653,16 @@ def evaluate_models(
 
         model.fit(x_train, y_train)
         pred_test = np.asarray(model.predict(x_test), dtype=object)
-        scores = decision_scores(model, x_test)
+        scores = decision_scores(model, x_test, positive_label=positive_label)
 
-        metrics = classification_metrics(y_test, pred_test, scores=scores)
-        cm = confusion_matrix(y_test, pred_test, labels=list(LABELS))
+        metrics = classification_metrics(
+            y_test,
+            pred_test,
+            labels=labels,
+            positive_label=positive_label,
+            scores=scores,
+        )
+        cm = confusion_matrix(y_test, pred_test, labels=list(labels))
 
         run_majority_rows: list[dict[str, Any]] = []
         grouped = pd.DataFrame(
@@ -580,7 +714,7 @@ def evaluate_models(
                     "label": str(record["label"]),
                     "window_index": int(record["window_index"]),
                     "pred_label": str(pred_test[idx]),
-                    "score_hands_up": float(scores[idx]) if scores is not None else np.nan,
+                    "score_positive": float(scores[idx]) if scores is not None else np.nan,
                 }
             )
 
@@ -647,10 +781,17 @@ def format_latex_table(frame: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def plot_boxplot(window_df: pd.DataFrame, feature: str, title: str, out_path: Path) -> None:
+def plot_boxplot(
+    window_df: pd.DataFrame,
+    feature: str,
+    title: str,
+    out_path: Path,
+    *,
+    labels: tuple[str, str],
+) -> None:
     plt.figure(figsize=(7.5, 4.5))
-    data = [window_df.loc[window_df["label"] == label, feature].dropna().to_numpy() for label in LABELS]
-    plt.boxplot(data, tick_labels=list(LABELS), showmeans=True)
+    data = [window_df.loc[window_df["label"] == label, feature].dropna().to_numpy() for label in labels]
+    plt.boxplot(data, tick_labels=list(labels), showmeans=True)
     plt.title(title)
     plt.ylabel(feature)
     plt.tight_layout()
@@ -658,16 +799,22 @@ def plot_boxplot(window_df: pd.DataFrame, feature: str, title: str, out_path: Pa
     plt.close()
 
 
-def plot_effect_sizes(effect_df: pd.DataFrame, out_path: Path) -> None:
+def plot_effect_sizes(
+    effect_df: pd.DataFrame,
+    out_path: Path,
+    *,
+    negative_label: str,
+    positive_label: str,
+) -> None:
     top = effect_df.head(8).iloc[::-1]
     plt.figure(figsize=(8.5, 5.5))
     plt.barh(
         top["feature"].astype(str),
-        top["cohens_d_hands_up_vs_baseline"].to_numpy(dtype=float),
+        top["cohens_d_positive_vs_negative"].to_numpy(dtype=float),
         color="#4c78a8",
     )
     plt.axvline(0.0, color="black", linewidth=1.0)
-    plt.title("Feature Effect Sizes: hands_up vs baseline")
+    plt.title(f"Feature Effect Sizes: {positive_label} vs {negative_label}")
     plt.xlabel("Cohen's d")
     plt.tight_layout()
     plt.savefig(out_path, dpi=300)
@@ -677,6 +824,7 @@ def plot_effect_sizes(effect_df: pd.DataFrame, out_path: Path) -> None:
 def plot_pca_windows(
     window_df: pd.DataFrame,
     *,
+    labels: tuple[str, str],
     train_idx: np.ndarray,
     seed: int,
     out_path: Path,
@@ -697,13 +845,13 @@ def plot_pca_windows(
 
     split_mask = np.zeros(len(window_df), dtype=bool)
     split_mask[train_idx] = True
-    colors = {"baseline": "#4c78a8", "hands_up": "#f58518"}
+    colors = {labels[0]: "#4c78a8", labels[1]: "#f58518"}
     markers = {True: "o", False: "^"}
-    labels = {True: "train", False: "test"}
+    phase_names = {True: "train", False: "test"}
 
     plt.figure(figsize=(7.5, 6.0))
     for phase in (True, False):
-        for label in LABELS:
+        for label in labels:
             mask = split_mask & (window_df["label"].to_numpy() == label) if phase else (
                 (~split_mask) & (window_df["label"].to_numpy() == label)
             )
@@ -716,7 +864,7 @@ def plot_pca_windows(
                 alpha=0.75,
                 marker=markers[phase],
                 color=colors[label],
-                label=f"{label} ({labels[phase]})",
+                label=f"{label} ({phase_names[phase]})",
             )
     plt.title("PCA of Window-Level RSSI + CSI Features")
     plt.xlabel("PC1")
@@ -727,12 +875,18 @@ def plot_pca_windows(
     plt.close()
 
 
-def plot_confusion_matrix_figure(cm: np.ndarray, out_path: Path, title: str) -> None:
+def plot_confusion_matrix_figure(
+    cm: np.ndarray,
+    out_path: Path,
+    title: str,
+    *,
+    labels: tuple[str, str],
+) -> None:
     plt.figure(figsize=(5.5, 4.5))
     plt.imshow(cm, cmap="Blues")
     plt.colorbar()
-    plt.xticks(range(len(LABELS)), LABELS)
-    plt.yticks(range(len(LABELS)), LABELS)
+    plt.xticks(range(len(labels)), labels)
+    plt.yticks(range(len(labels)), labels)
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
             plt.text(j, i, str(int(cm[i, j])), ha="center", va="center", color="black")
@@ -744,8 +898,15 @@ def plot_confusion_matrix_figure(cm: np.ndarray, out_path: Path, title: str) -> 
     plt.close()
 
 
-def plot_roc_curve_figure(y_true: np.ndarray, scores: np.ndarray, out_path: Path, title: str) -> None:
-    y_binary = (y_true == POS_LABEL).astype(int)
+def plot_roc_curve_figure(
+    y_true: np.ndarray,
+    scores: np.ndarray,
+    out_path: Path,
+    title: str,
+    *,
+    positive_label: str,
+) -> None:
+    y_binary = (y_true == positive_label).astype(int)
     fpr, tpr, _ = roc_curve(y_binary, scores)
     auc = roc_auc_score(y_binary, scores)
     plt.figure(figsize=(5.5, 4.5))
@@ -760,9 +921,14 @@ def plot_roc_curve_figure(y_true: np.ndarray, scores: np.ndarray, out_path: Path
     plt.close()
 
 
-def plot_example_timeseries(window_df: pd.DataFrame, out_path: Path) -> None:
+def plot_example_timeseries(
+    window_df: pd.DataFrame,
+    out_path: Path,
+    *,
+    labels: tuple[str, str],
+) -> None:
     example_runs = []
-    for label in LABELS:
+    for label in labels:
         label_runs = sorted(window_df.loc[window_df["label"] == label, "run_id"].astype(str).unique().tolist())
         if label_runs:
             example_runs.append((label, label_runs[0]))
@@ -797,6 +963,12 @@ def save_outputs(
     *,
     out_dir: Path,
     data_dir: Path,
+    experiment_id: str,
+    selected_run_ids: tuple[str, ...],
+    subject_map_supplied: bool,
+    labels: tuple[str, str],
+    negative_label: str,
+    positive_label: str,
     window_df: pd.DataFrame,
     run_df: pd.DataFrame,
     dataset_summary_df: pd.DataFrame,
@@ -849,26 +1021,44 @@ def save_outputs(
             feature="mean_rssi",
             title="Window Mean RSSI by Label",
             out_path=figs_dir / "boxplot_mean_rssi_by_label.png",
+            labels=labels,
         )
         plot_boxplot(
             window_df,
             feature="mean_amp",
             title="Window Mean CSI Amplitude by Label",
             out_path=figs_dir / "boxplot_mean_amp_by_label.png",
+            labels=labels,
         )
-        plot_effect_sizes(effect_df, figs_dir / "feature_effect_sizes.png")
-        plot_pca_windows(window_df, train_idx=train_idx, seed=seed, out_path=figs_dir / "pca_windows.png")
-        plot_example_timeseries(window_df, figs_dir / "timeseries_example_runs.png")
+        plot_effect_sizes(
+            effect_df,
+            figs_dir / "feature_effect_sizes.png",
+            negative_label=negative_label,
+            positive_label=positive_label,
+        )
+        plot_pca_windows(
+            window_df,
+            labels=labels,
+            train_idx=train_idx,
+            seed=seed,
+            out_path=figs_dir / "pca_windows.png",
+        )
+        plot_example_timeseries(
+            window_df,
+            figs_dir / "timeseries_example_runs.png",
+            labels=labels,
+        )
 
         cm = np.asarray(artifacts["confusion_matrices"][best_method], dtype=int)
         plot_confusion_matrix_figure(
             cm,
             figs_dir / "confusion_matrix_best_model.png",
             title=f"Confusion Matrix ({best_method})",
+            labels=labels,
         )
 
         best_predictions = prediction_df.loc[prediction_df["method"] == best_method].copy()
-        best_scores = best_predictions["score_hands_up"].to_numpy(dtype=float)
+        best_scores = best_predictions["score_positive"].to_numpy(dtype=float)
         if np.isfinite(best_scores).any():
             y_true = best_predictions["label"].astype(str).to_numpy()
             plot_roc_curve_figure(
@@ -876,33 +1066,40 @@ def save_outputs(
                 best_scores,
                 figs_dir / "roc_curve_best_model.png",
                 title=f"ROC Curve ({best_method})",
+                positive_label=positive_label,
             )
 
     split_train = split_df.loc[split_df["phase"] == "train", "run_id"].astype(str).tolist()
     split_test = split_df.loc[split_df["phase"] == "test", "run_id"].astype(str).tolist()
     participant_by_run = participant_lookup(run_df)
-    train_participants = sorted({participant_by_run.get(run_id, "[unknown]") for run_id in split_train})
-    test_participants = sorted({participant_by_run.get(run_id, "[unknown]") for run_id in split_test})
+    train_participants = sorted(
+        {participant_by_run.get(run_id, "subject-unknown") for run_id in split_train}
+    )
+    test_participants = sorted(
+        {participant_by_run.get(run_id, "subject-unknown") for run_id in split_test}
+    )
     participant_counts = ", ".join(
-        f"{row['participant_name']} x{int(row['session_count'])}"
+        f"{row['subject_id']} x{int(row['num_runs'])} runs"
         for _, row in participant_summary_df.iterrows()
-        if str(row["participant_name"]) != "[unknown]"
+        if str(row["subject_id"]) != "subject-unknown"
     )
 
     top_effect = effect_df.iloc[0]
     best_row = overall_df.iloc[0]
-    label_means = (
-        window_df.groupby("label")[["mean_rssi", "mean_amp"]].mean().reindex(list(LABELS))
-    )
+    label_means = window_df.groupby("label")[["mean_rssi", "mean_amp"]].mean().reindex(list(labels))
 
     report_lines = [
-        "# Static Gesture Analysis Report",
+        "# Binary CSI Classification Analysis Report",
         "",
         "## Task",
-        "Classify `baseline` vs `hands_up` from ESP32 RSSI/CSI windows using leakage-safe run-level evaluation.",
+        (
+            f"Classify `{labels[0]}` vs `{labels[1]}` for experiment `{experiment_id}` "
+            "from ESP32 RSSI/CSI windows using run-level evaluation."
+        ),
         "",
         "## Dataset Summary",
         f"- Data root: `{data_dir}`",
+        f"- Selected typed session runs: `{', '.join(selected_run_ids)}`",
         f"- Window size: `{window_s:.2f}s`, overlap: `{overlap:.2f}`",
         f"- Total runs: `{run_df['run_id'].nunique()}`",
         f"- Total windows: `{len(window_df)}`",
@@ -910,9 +1107,14 @@ def save_outputs(
         format_markdown_table(dataset_summary_df),
         "",
         "## Participant Structure",
-        "- Participants were recovered from `metadata.notes` because `subject_id` is `subject01` for all runs.",
-        f"- Distinct participants: `{participant_summary_df['participant_name'].nunique()}`",
-        f"- Session counts by participant: `{participant_counts}`",
+        (
+            "- An exact caller-supplied run-to-subject map was converted to analysis-local "
+            "opaque subject IDs before output."
+            if subject_map_supplied
+            else "- Explicit raw subject_id values were converted to analysis-local opaque subject IDs."
+        ),
+        f"- Distinct subject groups: `{participant_summary_df['subject_id'].nunique()}`",
+        f"- Run counts by subject group: `{participant_counts}`",
         "",
         format_markdown_table(participant_summary_df),
         "",
@@ -940,33 +1142,32 @@ def save_outputs(
             f"`run_majority_acc={best_row['run_majority_acc']:.4f}` on the held-out runs."
         ),
         (
-            f"Window-level confusion matrix for `{best_method}` (`{LABELS[0]}`, `{LABELS[1]}` order): "
+            f"Window-level confusion matrix for `{best_method}` (`{labels[0]}`, `{labels[1]}` order): "
             f"`{artifacts['confusion_matrices'][best_method]}`"
         ),
         "",
         "## Feature Separation",
         (
             f"Strongest single-feature separation was `{top_effect['feature']}` with "
-            f"`delta={top_effect['delta_hands_up_minus_baseline']:.4f}` and "
-            f"`Cohen_d={top_effect['cohens_d_hands_up_vs_baseline']:.4f}` "
-            "for `hands_up - baseline`."
+            f"`delta={top_effect['delta_positive_minus_negative']:.4f}` and "
+            f"`Cohen_d={top_effect['cohens_d_positive_vs_negative']:.4f}` "
+            f"for `{positive_label} - {negative_label}`."
         ),
         "",
         format_markdown_table(effect_df.head(6)),
         "",
         "## Observations",
         (
-            f"- Mean RSSI: baseline `{label_means.loc['baseline', 'mean_rssi']:.3f}` vs "
-            f"hands_up `{label_means.loc['hands_up', 'mean_rssi']:.3f}`."
+            f"- Mean RSSI: {negative_label} `{label_means.loc[negative_label, 'mean_rssi']:.3f}` vs "
+            f"{positive_label} `{label_means.loc[positive_label, 'mean_rssi']:.3f}`."
         ),
         (
-            f"- Mean CSI amplitude: baseline `{label_means.loc['baseline', 'mean_amp']:.3f}` vs "
-            f"hands_up `{label_means.loc['hands_up', 'mean_amp']:.3f}`."
+            f"- Mean CSI amplitude: {negative_label} `{label_means.loc[negative_label, 'mean_amp']:.3f}` vs "
+            f"{positive_label} `{label_means.loc[positive_label, 'mean_amp']:.3f}`."
         ),
         "- Fusion models quantify whether CSI adds value beyond RSSI-only features on the same run-level split.",
-        "- The dataset includes three participants with different body builds, so the task is not strictly single-subject.",
-        "- However, the split is run-level rather than leave-one-subject-out: the same participant can appear in both train and test under different labels.",
-        "- Therefore the reported metrics reflect posture discrimination with some inter-person variability, not clean cross-subject generalization.",
+        "- The split is run-level rather than leave-one-subject-out: the same opaque subject group can appear in both train and test under different labels.",
+        "- Therefore the reported metrics do not establish cross-subject generalization.",
         "",
         "## Outputs",
         "- `tables/table_dataset_summary.csv`",
@@ -1008,15 +1209,43 @@ def save_outputs(
 def run_analysis(args: argparse.Namespace) -> None:
     data_dir = Path(args.data_dir)
     out_dir = Path(args.out_dir)
+    labels = tuple(args.labels)
+    run_ids = tuple(args.run_ids)
+    subject_map = load_subject_map(
+        Path(args.subject_map) if args.subject_map else None,
+        selected_run_ids=run_ids,
+    )
+    positive_label = str(args.positive_label)
+    negative_label = next(label for label in labels if label != positive_label)
 
-    window_df, run_df = build_window_dataframe(data_dir, window_s=args.window_s, overlap=args.overlap)
+    window_df, run_df = build_window_dataframe(
+        data_dir,
+        run_ids=run_ids,
+        subject_map=subject_map,
+        source_experiment_name=args.source_experiment_name,
+        labels=labels,
+        schema_version=args.schema_version,
+        window_s=args.window_s,
+        overlap=args.overlap,
+    )
     dataset_summary_df = summarize_dataset(run_df)
     participant_summary_df = summarize_participants(run_df)
     feature_summary_df = summarize_window_features(window_df)
-    effect_df = compute_feature_effect_sizes(window_df)
-    train_idx, test_idx, split_df = balanced_group_split(window_df, test_size=args.test_size, seed=args.seed)
+    effect_df = compute_feature_effect_sizes(
+        window_df,
+        negative_label=negative_label,
+        positive_label=positive_label,
+    )
+    train_idx, test_idx, split_df = balanced_group_split(
+        window_df,
+        labels=labels,
+        test_size=args.test_size,
+        seed=args.seed,
+    )
     overall_df, per_run_df, prediction_df, artifacts = evaluate_models(
         window_df,
+        labels=labels,
+        positive_label=positive_label,
         train_idx=train_idx,
         test_idx=test_idx,
         seed=args.seed,
@@ -1025,6 +1254,12 @@ def run_analysis(args: argparse.Namespace) -> None:
     save_outputs(
         out_dir=out_dir,
         data_dir=data_dir,
+        experiment_id=args.experiment_id,
+        selected_run_ids=run_ids,
+        subject_map_supplied=subject_map is not None,
+        labels=labels,
+        negative_label=negative_label,
+        positive_label=positive_label,
         window_df=window_df,
         run_df=run_df,
         dataset_summary_df=dataset_summary_df,
@@ -1060,6 +1295,15 @@ def main() -> None:
         raise ValueError("--overlap must be in [0, 1)")
     if not (0.0 < args.test_size < 1.0):
         raise ValueError("--test_size must be in (0, 1)")
+    if args.labels[0] == args.labels[1]:
+        raise ValueError("--labels must contain two distinct values")
+    if args.positive_label not in args.labels:
+        raise ValueError("--positive_label must be one of --labels")
+    if len(set(args.run_ids)) != len(args.run_ids):
+        raise ValueError("--run_id values must be unique")
+    for run_id in args.run_ids:
+        if run_id in {"", ".", ".."} or Path(run_id).name != run_id:
+            raise ValueError("--run_id must be a non-empty path component")
     run_analysis(args)
 
 
