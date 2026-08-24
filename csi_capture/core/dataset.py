@@ -420,7 +420,7 @@ def load_labeled_run_dirs(
     labels: Sequence[str] | None = None,
     schema_version: int | str | None = None,
 ) -> list[RunCapture]:
-    """Load an explicit caller-selected list of typed session run directories."""
+    """Load an explicit caller-selected list of typed experiment run directories."""
 
     if not run_dirs:
         raise ValueError("run_dirs must not be empty")

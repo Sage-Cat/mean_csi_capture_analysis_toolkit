@@ -63,19 +63,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--out_dir",
         required=True,
-        help="Session-owned output directory for figures, tables, and report.",
+        help="Experiment-owned output directory for figures, tables, and report.",
     )
     parser.add_argument(
         "--experiment_id",
         required=True,
-        help="Current session experiment identifier recorded in the analysis report.",
+        help="Current experiment identifier recorded in the analysis report.",
     )
     parser.add_argument(
         "--run_id",
         dest="run_ids",
         action="append",
         required=True,
-        help="Exact typed session run ID below --data_dir; repeat for every selected run.",
+        help="Exact typed experiment run ID below --data_dir; repeat for every selected run.",
     )
     parser.add_argument(
         "--source_experiment_name",
@@ -1099,7 +1099,7 @@ def save_outputs(
         "",
         "## Dataset Summary",
         f"- Data root: `{data_dir}`",
-        f"- Selected typed session runs: `{', '.join(selected_run_ids)}`",
+        f"- Selected typed experiment runs: `{', '.join(selected_run_ids)}`",
         f"- Window size: `{window_s:.2f}s`, overlap: `{overlap:.2f}`",
         f"- Total runs: `{run_df['run_id'].nunique()}`",
         f"- Total windows: `{len(window_df)}`",

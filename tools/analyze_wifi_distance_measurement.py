@@ -24,6 +24,7 @@ from csi_capture.analysis.common import (
     DATA_SUFFIXES,
     decode_payload_bytes,
     discover_files,
+    discover_test_case_files,
     infer_distance_from_path,
     infer_run_id_from_path,
     infer_scenario_from_path,
@@ -96,9 +97,14 @@ def parse_args() -> argparse.Namespace:
         help="Root directory containing experiment logs (CSV/JSONL/JSON/TXT).",
     )
     parser.add_argument(
+        "--test_case_id",
+        default="",
+        help="Optional experiment-local test case used to select direct run directories.",
+    )
+    parser.add_argument(
         "--out_dir",
         required=True,
-        help="Session-owned output directory for plots, tables, and report.",
+        help="Experiment-owned output directory for plots, tables, and report.",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     parser.add_argument(
@@ -792,7 +798,11 @@ def run_analysis(args: argparse.Namespace) -> None:
     """Execute full ingestion, modeling, evaluation, and export pipeline."""
     data_dir = Path(args.data_dir)
     out_dir = Path(args.out_dir)
-    files = discover_files(data_dir)
+    files = (
+        discover_test_case_files(data_dir, args.test_case_id)
+        if args.test_case_id
+        else discover_files(data_dir)
+    )
     LOGGER.info("Found %d candidate data files under %s", len(files), data_dir)
 
     frame, amp_matrix = build_packet_dataframe(

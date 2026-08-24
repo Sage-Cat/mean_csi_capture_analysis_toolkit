@@ -63,7 +63,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--out_dir",
         required=True,
-        help="Session-owned output directory for tables, plots, and report.",
+        help="Experiment-owned output directory for tables, plots, and report.",
     )
     parser.add_argument(
         "--reference_scenario",

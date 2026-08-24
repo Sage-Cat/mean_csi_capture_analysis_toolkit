@@ -4,6 +4,7 @@ import base64
 import binascii
 import json
 import re
+import tomllib
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -52,6 +53,44 @@ def discover_files(data_dir: Path, suffixes: set[str] | None = None) -> list[Pat
             f"No supported data files ({sorted(allowed)}) found under: {data_dir}"
         )
     return files
+
+
+def discover_test_case_files(
+    runs_dir: Path,
+    test_case_id: str,
+    suffixes: set[str] | None = None,
+) -> list[Path]:
+    """Discover data only in direct runs assigned to one experiment test case."""
+
+    if not runs_dir.is_dir():
+        raise FileNotFoundError(f"Runs directory not found: {runs_dir}")
+    selected_runs: list[Path] = []
+    for run_dir in sorted(path for path in runs_dir.iterdir() if path.is_dir()):
+        manifest_path = run_dir / "run.toml"
+        try:
+            with manifest_path.open("rb") as stream:
+                manifest = tomllib.load(stream)
+        except (OSError, tomllib.TOMLDecodeError) as error:
+            raise ValueError(f"Invalid run manifest: {manifest_path}") from error
+        if manifest.get("test_case_id") == test_case_id:
+            selected_runs.append(run_dir)
+    if not selected_runs:
+        raise FileNotFoundError(
+            f"Unknown test case {test_case_id!r} under: {runs_dir}"
+        )
+    allowed = suffixes or DATA_SUFFIXES
+    selected = sorted(
+        path
+        for run_dir in selected_runs
+        for path in run_dir.rglob("*")
+        if path.is_file() and path.suffix.lower() in allowed
+    )
+    if not selected:
+        raise FileNotFoundError(
+            f"No supported data files ({sorted(allowed)}) found for test case "
+            f"{test_case_id!r} under: {runs_dir}"
+        )
+    return selected
 
 
 def iter_records(path: Path) -> Iterator[dict[str, Any]]:
