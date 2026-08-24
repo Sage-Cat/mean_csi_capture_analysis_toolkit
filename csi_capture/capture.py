@@ -137,7 +137,7 @@ def main() -> int:
         "-o",
         "--output",
         required=True,
-        help="Session-owned output file path (jsonl or csv)",
+        help="Experiment-owned output file path (jsonl or csv)",
     )
     parser.add_argument(
         "--format",
@@ -154,7 +154,7 @@ def main() -> int:
     parser.add_argument(
         "--metadata-json",
         default="{}",
-        help="JSON object added to every record; study semantics are supplied by the session.",
+        help="JSON object added to every record; study semantics are supplied by the experiment.",
     )
     args = parser.parse_args()
 

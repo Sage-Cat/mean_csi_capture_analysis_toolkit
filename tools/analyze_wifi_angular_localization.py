@@ -95,7 +95,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--out_dir",
         required=True,
-        help="Session-owned output directory for plots, tables, and report.",
+        help="Experiment-owned output directory for plots, tables, and report.",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     parser.add_argument(

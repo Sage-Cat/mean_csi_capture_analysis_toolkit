@@ -22,6 +22,7 @@ if str(ROOT_DIR) not in sys.path:
 from csi_capture.analysis.common import (
     decode_payload_bytes,
     discover_files,
+    discover_test_case_files,
     infer_distance_from_path,
     infer_run_id_from_path,
     infer_scenario_from_path,
@@ -75,7 +76,12 @@ def parse_args() -> argparse.Namespace:
     """Parse CLI options."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_dir", required=True, help="Input dataset root.")
-    parser.add_argument("--out_dir", required=True, help="Session-owned output directory.")
+    parser.add_argument("--out_dir", required=True, help="Experiment-owned output directory.")
+    parser.add_argument(
+        "--test_case_id",
+        default="",
+        help="Optional experiment-local test case used to select direct run directories.",
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     parser.add_argument(
         "--window_sizes",
@@ -667,7 +673,11 @@ def run(args: argparse.Namespace) -> None:
     if args.acf_max_lag < 1:
         raise ValueError("--acf_max_lag must be > 0.")
 
-    files = discover_input_files(data_dir)
+    files = (
+        discover_test_case_files(data_dir, args.test_case_id, suffixes={".csv", ".jsonl"})
+        if args.test_case_id
+        else discover_input_files(data_dir)
+    )
     LOGGER.info("Found %d input files.", len(files))
     frame = build_dataset(files)
 

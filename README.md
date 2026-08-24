@@ -4,17 +4,17 @@
 and parameterized offline analysis tools. It does not own study definitions,
 experiments, datasets, models, or results.
 
-Every writer requires an explicit session-owned destination. For example:
+Every writer requires an explicit experiment-owned destination. For example:
 
 ```bash
 python3 -m csi_capture.capture --port /dev/ttyACM1 \
-  --output /path/to/experiments/private/<session>/experiments/<id>/runs/<run>/raw/capture.jsonl \
-  --metadata-json '{"experiment_id":"<id>","run_id":"<run>"}'
+  --output /path/to/experiments/private/<experiment>/runs/<run>/raw/capture.jsonl \
+  --metadata-json '{"experiment_id":"<experiment>","run_id":"<run>"}'
 python3 tools/analyze_wifi_classification.py \
-  --data_dir /path/to/experiments/private/<session>/experiments/<id>/runs \
-  --out_dir /path/to/experiments/private/<session>/analysis/classification \
-  --experiment_id <id> --run_id <run-a> --run_id <run-b> \
-  --subject-map /path/to/session-owned/subject-map.json \
+  --data_dir /path/to/experiments/private/<experiment>/runs \
+  --out_dir /path/to/experiments/private/<experiment>/analysis/classification \
+  --experiment_id <experiment> --run_id <run-a> --run_id <run-b> \
+  --subject-map /path/to/experiments/private/<experiment>/setup/subject-map.json \
   --labels <negative> <positive> --positive_label <positive>
 ```
 
