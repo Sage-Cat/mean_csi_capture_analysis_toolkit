@@ -43,14 +43,17 @@ class CaptureStreamTests(unittest.TestCase):
             lines,
             out,
             output_format="jsonl",
-            metadata={"exp_id": "exp01", "scenario": "LoS", "run_id": 1, "distance_m": 2.0},
+            metadata={
+                "experiment_id": "experiment-a",
+                "run_id": "run-001",
+                "ground_truth": {"quantity": 2.0},
+            },
         )
         self.assertEqual(written, 1)
         payload = json.loads(out.getvalue().strip())
-        self.assertEqual(payload["exp_id"], "exp01")
-        self.assertEqual(payload["scenario"], "LoS")
-        self.assertEqual(payload["run_id"], 1)
-        self.assertEqual(payload["distance_m"], 2.0)
+        self.assertEqual(payload["experiment_id"], "experiment-a")
+        self.assertEqual(payload["run_id"], "run-001")
+        self.assertEqual(payload["ground_truth"], {"quantity": 2.0})
 
     def test_capture_jsonl_with_zero_max_records(self):
         lines = [

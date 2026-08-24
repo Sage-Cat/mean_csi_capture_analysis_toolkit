@@ -1,11 +1,12 @@
-"""Shared experiment framework primitives."""
+"""Reusable CSI data, device, environment, and analysis primitives."""
 
 from .dataset import (
     NormalizedRun,
     NormalizedTrialCapture,
     RunCapture,
+    load_labeled_run_dirs,
+    load_labeled_runs,
     load_normalized_runs,
-    load_static_sign_runs,
     validate_run_metadata,
 )
 from .domain import (
@@ -75,8 +76,9 @@ __all__ = [
     "CANONICAL_SCHEMA_NAME",
     "CANONICAL_SCHEMA_VERSION",
     "list_serial_candidates",
+    "load_labeled_run_dirs",
+    "load_labeled_runs",
     "load_normalized_runs",
-    "load_static_sign_runs",
     "resolve_environment_profile",
     "resolve_serial_device",
     "validate_run_metadata",
