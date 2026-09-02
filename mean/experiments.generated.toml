@@ -17,4 +17,7 @@ experiment_id = "csi_capture_characterization--20260302T000000Z--angle-static-si
 experiment_id = "csi_capture_characterization--20260309T000000Z--interference-obstacle-series"
 
 [[experiments]]
+experiment_id = "paired_path_centralized_raw_node_local_feature_comparison--20260902T163000Z--physical-node-local-path-qualification"
+
+[[experiments]]
 experiment_id = "wifi_environment_interference_survey--20260902T142249Z--residential_network_stabilization"
