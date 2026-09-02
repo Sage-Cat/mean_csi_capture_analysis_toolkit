@@ -26,3 +26,21 @@ Without a map, only explicit raw `subject_id` values are used.
 
 Domain analyzers expose their complete parameter contract through `--help`.
 Run `make test` for the hardware-independent unit suite.
+
+For a physical node-local descriptor path, copy the unchanged standard-library
+exporter to the sensing host and give it that host's sealed collector archive
+plus an experiment-owned output directory:
+
+```bash
+python3 tools/export_node_local_descriptors.py \
+  --archive /var/lib/cws-collector/runs/<collector-run-id> \
+  --output /path/owned/by/the/experiment \
+  --source-id <source-id> --run-id <run-id> --node-id <node-id> \
+  --execution-boundary physical-node-local
+```
+
+The exporter emits a fixed ordered 12-component descriptor, exact input/output
+hashes, execution-boundary identity, serialized bytes, CPU/wall time, and peak
+resident memory. Running the identical file against the copied archive supplies
+the centralized-replay side of a paired-path comparison; it does not by itself
+establish a scientific equivalence or performance claim.
