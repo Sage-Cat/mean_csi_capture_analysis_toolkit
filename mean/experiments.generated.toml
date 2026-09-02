@@ -20,4 +20,7 @@ experiment_id = "csi_capture_characterization--20260309T000000Z--interference-ob
 experiment_id = "paired_path_centralized_raw_node_local_feature_comparison--20260902T163000Z--physical-node-local-path-qualification"
 
 [[experiments]]
+experiment_id = "paired_path_centralized_raw_node_local_feature_comparison--20260902T172200Z--natural-operation-rta02-paired-m2-batch01"
+
+[[experiments]]
 experiment_id = "wifi_environment_interference_survey--20260902T142249Z--residential_network_stabilization"
