@@ -15,3 +15,6 @@ experiment_id = "csi_capture_characterization--20260302T000000Z--angle-static-si
 
 [[experiments]]
 experiment_id = "csi_capture_characterization--20260309T000000Z--interference-obstacle-series"
+
+[[experiments]]
+experiment_id = "wifi_environment_interference_survey--20260902T142249Z--residential_network_stabilization"
