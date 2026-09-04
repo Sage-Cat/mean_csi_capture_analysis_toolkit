@@ -3,3 +3,9 @@ schema_version = 1
 owner_type = "mean"
 owner_id = "csi_capture_analysis_toolkit"
 generated_from = "sage-science/works/**/research-links.toml"
+
+[[publications]]
+work_id = "cooperative_wifi_sensing_raw_central_local_feature_comparison"
+role = "supplies the hash-pinned node-local descriptor extractor used on physical processors and in central replay"
+claim_ids = []
+lifecycle = "journal.cooperative_wifi_sensing_raw_central_local_feature_comparison.ecsa_13:on_hold;journal.cooperative_wifi_sensing_raw_central_local_feature_comparison.eom:active"
