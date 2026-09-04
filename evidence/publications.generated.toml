@@ -5,7 +5,7 @@ owner_id = "csi_capture_analysis_toolkit"
 generated_from = "sage-science/works/**/research-links.toml"
 
 [[publications]]
-work_id = "cooperative_wifi_sensing_raw_central_local_feature_comparison"
+work_id = "interzone_descriptor_fusion_robustness"
 role = "supplies the hash-pinned node-local descriptor extractor used on physical processors and in central replay"
 claim_ids = []
-lifecycle = "journal.cooperative_wifi_sensing_raw_central_local_feature_comparison.ecsa_13:on_hold;journal.cooperative_wifi_sensing_raw_central_local_feature_comparison.eom:active"
+lifecycle = "journal.interzone_descriptor_fusion_robustness.icis:active"
