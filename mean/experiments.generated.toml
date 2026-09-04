@@ -26,4 +26,7 @@ experiment_id = "paired_path_centralized_raw_node_local_feature_comparison--2026
 experiment_id = "paired_path_centralized_raw_node_local_feature_comparison--20260903T101100Z--natural-operation-m2-stratum02"
 
 [[experiments]]
+experiment_id = "paired_path_centralized_raw_node_local_feature_comparison--20260904T081440Z--natural-operation-m2-stratum03"
+
+[[experiments]]
 experiment_id = "wifi_environment_interference_survey--20260902T142249Z--residential_network_stabilization"
