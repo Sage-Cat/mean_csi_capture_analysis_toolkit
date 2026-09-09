@@ -13,6 +13,9 @@ pip-wheel-metadata/
 # Local editor workspace settings
 .vscode/
 
+# Local task worktrees
+/wt/
+
 # Local experiment runs (directory or symlink)
 /experiments
 
