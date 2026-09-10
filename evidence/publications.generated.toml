@@ -5,7 +5,7 @@ owner_id = "csi_capture_analysis_toolkit"
 generated_from = "sage-science/works/**/research-links.toml"
 
 [[publications]]
-work_id = "interzone_descriptor_fusion_robustness"
+work_id = "local_central_csi_descriptor_verification"
 role = "supplies the hash-pinned node-local descriptor extractor used on physical processors and in central replay"
 claim_ids = []
-lifecycle = "journal.interzone_descriptor_fusion_robustness.icis:active"
+lifecycle = "journal.local_central_csi_descriptor_verification.icis:active"
