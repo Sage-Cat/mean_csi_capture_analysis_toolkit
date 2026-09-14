@@ -9,3 +9,9 @@ work_id = "local_central_csi_descriptor_verification"
 role = "supplies the hash-pinned node-local descriptor extractor used on physical processors and in central replay"
 claim_ids = []
 lifecycle = "journal.local_central_csi_descriptor_verification.icis:active"
+
+[[publications]]
+work_id = "phd"
+role = "Historical capture and descriptor analysis used in the paired-path evidence; chapters 2.3 and 4.3, distinct from the current three-component controller prototype."
+claim_ids = []
+lifecycle = "dissertation.phd:active"
